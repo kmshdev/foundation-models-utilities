@@ -1,3 +1,15 @@
+# Engineering Studio
+
+Native SwiftUI engineering workspace for **iOS 27 and macOS 27**, implemented in **Swift 6.4**. The `swift-app` branch contains the app alongside the FoundationModelsUtilities library.
+
+Open [`EngineeringStudio.xcodeproj`](EngineeringStudio.xcodeproj) and select `EngineeringStudioiOS` or `EngineeringStudioMac`. App source is in [`Apps/EngineeringStudio`](Apps/EngineeringStudio); the portable coordination package and its tests are in [`Packages/EngineeringCore`](Packages/EngineeringCore). Both app targets use the root utilities package locally.
+
+**Current status:** app source and tested coordination core. Native compilation and UI behavior remain unverified; ChatGPT subscription authentication, connected developer execution, and GitHub/Linear synchronization are unfinished. This is not an installable release.
+
+See the [app guide](Apps/EngineeringStudio/README.md) for setup, validation and remaining work. All implementation code must remain Swift; the repository [agent instructions](AGENTS.md) record that requirement.
+
+---
+
 <h1>
   <img alt="Apple Foundation Models framework logo" src="./assets/fm-icon-27.png" width="90" valign="middle">
   &nbsp;Foundation Models framework utilities
