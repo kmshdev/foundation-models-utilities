@@ -1,0 +1,25 @@
+name: Capture native SwiftUI previews
+on:
+  push:
+    branches: [swift-app]
+    paths:
+      - 'Tools/SwiftUIPreview/**'
+      - '.github/workflows/screenshots.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  screenshots:
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build isolated SwiftUI preview host
+        run: swift Tools/SwiftUIPreview/BuildPreview.swift
+      - name: Capture actual SwiftUI view rendering
+        run: .preview-build/SwiftUIPreview.app/Contents/MacOS/SwiftUIPreview "$RUNNER_TEMP/native-previews"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-swiftui-previews
+          path: ${{ runner.temp }}/native-previews/*.png
+          if-no-files-found: error

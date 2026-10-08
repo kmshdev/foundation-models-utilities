@@ -17,6 +17,11 @@ enum StudioSection: String, CaseIterable, Identifiable {
 struct StudioRootView: View {
     @Bindable var store: StudioStore
     @State private var selection: StudioSection? = .room
+    /// The initial section is a one-time navigation seed, including for previews.
+    init(store: StudioStore, initialSection: StudioSection = .room) {
+        self.store = store
+        _selection = State(initialValue: initialSection)
+    }
     var body: some View {
         Group {
             #if os(macOS)

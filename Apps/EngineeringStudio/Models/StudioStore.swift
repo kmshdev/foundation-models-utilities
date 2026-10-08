@@ -20,6 +20,17 @@ final class StudioStore {
         usesOnDeviceModel = UserDefaults.standard.bool(forKey: "usesOnDeviceModel")
     }
 
+    #if DEBUG
+    /// Self-contained preview state; does not read user defaults, disk or services.
+    init(preview workspace: Workspace) {
+        self.workspace = workspace
+        repository = WorkspaceRepository(url: URL.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+        isLoaded = true
+        loadStarted = true
+        saveState = "Preview data · not connected"
+    }
+    #endif
+
     func load() async {
         guard !loadStarted else { return }; loadStarted = true
         do {
