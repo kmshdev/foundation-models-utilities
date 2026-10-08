@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "name": "Engineering Coordinator",
+  "confirmed": {
+    "developer_count": 8,
+    "linear_project": "Engineering Workflow Automation",
+    "audience": "Personal use: user directing their own engineering bots",
+    "deployment_mode": "personal_self_hosted",
+    "specialties": [
+      "Architecture and Swift concurrency",
+      "Foundation Models",
+      "Authentication and session security",
+      "SwiftUI and accessibility",
+      "iOS/macOS integration",
+      "Cloudflare infrastructure",
+      "Testing and evaluation",
+      "CI and integration"
+    ],
+    "first_outcome": "Build the engineering coordinator and team workflow"
+  },
+  "repository": "kmshdev/foundation-models-utilities",
+  "linearProject": {
+    "name": "Engineering Workflow Automation",
+    "id": "c655b4e0-e003-424a-a29a-3674e9a3983b"
+  },
+  "activeTaskLimit": 3,
+  "review": {
+    "always_require_explicit_user_approval": [],
+    "policy_source": "Latest user instruction: There is no approval requirement. Supersedes earlier user-imposed approval checkpoints.",
+    "rules": [
+      "Proceed autonomously within established resource scope and user instructions.",
+      "Do not invent repository/project/group access or platform capabilities.",
+      "Report actual actions and results in the chat.",
+      "Mandatory platform authorization and missing credentials cannot be bypassed."
+    ]
+  },
+  "communication": {
+    "primary_interface": "Ordinary messages in the current chat, suitable for a phone",
+    "input": "Accept natural language, short replies, outcomes, ticket links, corrections, status requests and stop requests without requiring widgets, files or special syntax",
+    "output": "Concise coordinator reports in the current conversation: completed work, current owners, handoffs, actual tests, links and concrete blockers",
+    "questions": "Ask only necessary unresolved questions as plain text in the final chat message. No invisible question-card tools or artifact-dependent setup.",
+    "execution_truth": "Do not imply separate persistent bots, background execution or an external group connection exists until provisioned and verified.",
+    "question_policy": "Persist each answer immediately. Consult confirmed_preferences and conversation history before asking. Never repeat an answered question. Ask at most one essential unresolved question at a time through the interactive tool, then wait for the reply.",
+    "interactive_sequence": [
+      "Ask one essential unanswered question through the interactive tool.",
+      "Keep that question pending; do not ask another or perform work that depends on an unanswered choice.",
+      "On receiving the answer, acknowledge and persist it before advancing.",
+      "Do not resend an answered question."
+    ]
+  },
+  "developmentGuidelines": {
+    "stack": {
+      "swift": "6.4",
+      "ui": "Latest SwiftUI compatible with target SDK",
+      "platforms": [
+        "iOS 27",
+        "macOS 27"
+      ]
+    },
+    "verification": "Before implementation, verify named APIs, utilities, sample sources and SDK availability against official Apple documentation and the selected Xcode toolchain. Record discrepancies rather than inventing APIs or silently changing targets.",
+    "foundation_models": [
+      "Obtain the official Foundation Models framework utilities/building blocks; review source and licensing before adopting dependencies.",
+      "Adopt LanguageModel to support server or on-device models through Foundation Models.",
+      "Use LanguageModelSession.DynamicProfile for multimodal agentic experiences where required by the outcome.",
+      "Distinguish LanguageModelError, SystemLanguageModel.Error and LanguageModelSession.Error.",
+      "Control tool interaction explicitly through GenerationOptions.ToolCallingMode; preserve human approval gates outside model discretion.",
+      "Review Origami: Crafting a dynamic tutorial for Apple Intelligence, including Private Cloud Compute and third-party model examples."
+    ],
+    "design": [
+      "Follow Apple's HIG for layout, scroll views, tab bars, sheets, typography, writing, color, buttons, SF Symbols and motion.",
+      "Use material and Liquid Glass appropriately, preserving readability and accessibility.",
+      "Apply updated sheet button-placement guidance and emphasized Dynamic Type weights for each platform.",
+      "Respect Reduce Motion, Reduce Transparency, contrast, VoiceOver and keyboard navigation."
+    ],
+    "sources": [
+      "https://developer.apple.com/documentation/updates",
+      "https://developer.apple.com/design/human-interface-guidelines/layout",
+      "https://developer.apple.com/design/human-interface-guidelines/scroll-views",
+      "https://developer.apple.com/design/human-interface-guidelines/tab-bars",
+      "https://developer.apple.com/design/human-interface-guidelines/sheets",
+      "https://developer.apple.com/design/human-interface-guidelines/typography",
+      "https://developer.apple.com/design/human-interface-guidelines/writing",
+      "https://developer.apple.com/design/human-interface-guidelines/color",
+      "https://developer.apple.com/design/human-interface-guidelines/buttons",
+      "https://developer.apple.com/design/human-interface-guidelines/sf-symbols",
+      "https://developer.apple.com/design/human-interface-guidelines/motion"
+    ]
+  },
+  "designPreferences": {
+    "direction": "Technical editorial",
+    "palette": [
+      "warm cream",
+      "charcoal",
+      "orange",
+      "pale blueprint blue"
+    ],
+    "typography": "Large restrained sans headlines, occasional editorial serif, monospace labels",
+    "layout": "Fine ruled grids, square corners, generous whitespace, clear hierarchy",
+    "accessibility": "High contrast, visible focus, mobile reflow, reduced motion",
+    "delivery": "Self-contained downloadable HTML and readable PDF; do not rely exclusively on embedded viewers"
+  }
+}

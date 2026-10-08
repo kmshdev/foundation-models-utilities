@@ -1,0 +1,27 @@
+{
+  "name": "engineering-coordinator",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "types": "wrangler types --include-runtime false",
+    "check": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "build": "wrangler deploy --dry-run --minify --outdir dist",
+    "deploy": "wrangler deploy",
+    "test:runtime": "node tests/runtime.mjs"
+  },
+  "dependencies": {
+    "agents": "0.27.0",
+    "jose": "^6.1.0",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261008.1",
+    "@types/node": "^24.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "wrangler": "4.148.0"
+  }
+}
