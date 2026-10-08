@@ -40,12 +40,12 @@
     "output": "Concise coordinator reports in the current conversation: completed work, current owners, handoffs, actual tests, links and concrete blockers",
     "questions": "Ask only necessary unresolved questions as plain text in the final chat message. No invisible question-card tools or artifact-dependent setup.",
     "execution_truth": "Do not imply separate persistent bots, background execution or an external group connection exists until provisioned and verified.",
-    "question_policy": "Persist each answer immediately. Consult confirmed_preferences and conversation history before asking. Never repeat an answered question. Ask at most one essential unresolved question at a time through the interactive tool, then wait for the reply.",
+    "question_policy": "Consult saved answers and history. Batch all genuinely blocking unresolved questions in the interactive tool, include no repeated preferences, and leave the batch pending until responses arrive. Acknowledge and persist received answers before advancing dependent work.",
     "interactive_sequence": [
-      "Ask one essential unanswered question through the interactive tool.",
-      "Keep that question pending; do not ask another or perform work that depends on an unanswered choice.",
-      "On receiving the answer, acknowledge and persist it before advancing.",
-      "Do not resend an answered question."
+      "Collect genuinely blocking unanswered questions into one batch.",
+      "Ask through the interactive tool and leave the batch pending.",
+      "Accept answers asynchronously; record each and do not repeat it.",
+      "Continue only independent work while waiting; advance dependent work once its required answers arrive."
     ]
   },
   "developmentGuidelines": {
