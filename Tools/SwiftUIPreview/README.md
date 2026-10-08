@@ -1,6 +1,6 @@
 # Native screenshot previews
 
-This Swift-only host compiles the app's actual view and store source on the available macOS 26 runner. It captures native SwiftUI rendering with AppKit's documented `NSView.cacheDisplay(in:to:)` API. It does not redraw the UI in HTML or generate an imagined image.
+This Swift-only host compiles the app's actual view and store source on the available macOS 26 runner. It captures the real window with macOS `screencapture`, including composited AppKit controls that a view bitmap cache omits. It does not redraw the UI in HTML or generate an imagined image.
 
 The SDK 27 Foundation Models service is excluded and replaced by a preview-only implementation that always throws if called. State is in-memory preview data. Every image is visibly labeled as a preview with services disabled. These captures do not establish that the full iOS/macOS 27 app builds or runs.
 

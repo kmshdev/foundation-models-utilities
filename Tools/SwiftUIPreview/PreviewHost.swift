@@ -71,12 +71,18 @@ private final class CaptureDelegate: NSObject, NSApplicationDelegate {
         try await Task.sleep(for: .seconds(2))
         host.layoutSubtreeIfNeeded()
         host.displayIfNeeded()
-        guard let bitmap = host.bitmapImageRepForCachingDisplay(in: host.bounds) else {
+        // AppKit's view bitmap cache omits composited sidebar/control layers.
+        // Capture the real window through macOS so those layers are included.
+        let destination = output.appendingPathComponent(name + ".png")
+        let capture = Process()
+        capture.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+        capture.arguments = ["-x", "-o", "-l", String(window.windowNumber), destination.path]
+        try capture.run()
+        capture.waitUntilExit()
+        guard capture.terminationStatus == 0,
+              let bitmap = NSBitmapImageRep(data: try Data(contentsOf: destination)) else {
             throw CocoaError(.fileWriteUnknown)
         }
-        host.cacheDisplay(in: host.bounds, to: bitmap)
-        guard let data = bitmap.representation(using: .png, properties: [:]) else { throw CocoaError(.fileWriteUnknown) }
-        try data.write(to: output.appendingPathComponent(name + ".png"))
         print("Captured \(name): \(bitmap.pixelsWide) × \(bitmap.pixelsHigh)")
         window.close()
     }
