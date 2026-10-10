@@ -7,6 +7,7 @@ final class StudioStore {
     private(set) var workspace = Workspace()
     private(set) var isLoaded = false
     private(set) var isPlanning = false
+    private(set) var planningOutcomeID: UUID?
     private(set) var saveState = "Opening workspace"
     var failure: String?
     var usesOnDeviceModel = false
@@ -60,16 +61,19 @@ final class StudioStore {
         guard usesOnDeviceModel, !isPlanning,
               !workspace.questions.contains(where: { $0.outcomeID == outcome.id && !$0.isComplete }) else { return }
         isPlanning = true
+        planningOutcomeID = outcome.id
         let answers = workspace.questions.filter { $0.outcomeID == outcome.id }.flatMap(\.questions)
             .compactMap { question in question.answer.map { "\(question.prompt): \($0)" } }.joined(separator: "\n")
         planningTask = Task {
-            defer { isPlanning = false; planningTask = nil }
+            defer { isPlanning = false; planningOutcomeID = nil; planningTask = nil }
             do {
-                let result = try await FoundationPlanner.onDevice(outcome: outcome.text, answers: answers)
+                let context = workspace.messages.filter { $0.outcomeID == outcome.id && $0.author == .user && $0.text != outcome.text }
+                    .map(\.text).joined(separator: "\n")
+                let result = try await FoundationPlanner.onDevice(outcome: outcome.text, answers: [answers, context].joined(separator: "\n"))
                 try Task.checkCancellation()
                 if !result.questions.isEmpty {
                     workspace.questions.append(.init(outcomeID: outcome.id, questions: result.questions))
-                    workspace.messages.append(.init(author: .coordinator, text: "I need these details to finish the assignment plan. You can answer them together below."))
+                    workspace.messages.append(.init(author: .coordinator, text: "I need these details to finish the assignment plan. You can answer them together below.", outcomeID: outcome.id))
                     workspace.revision += 1
                 } else if let plan = result.plan {
                     try workspace.attach(plan, to: outcome.id)
@@ -81,6 +85,15 @@ final class StudioStore {
     }
 
     func cancelPlanning() { planningTask?.cancel() }
+
+    @discardableResult func send(_ text: String, to outcomeID: UUID) -> Bool {
+        guard isLoaded else { return false }
+        do {
+            try workspace.recordMessage(text, for: outcomeID)
+            persist()
+            return true
+        } catch { failure = error.localizedDescription; return false }
+    }
 
     func answer(_ batch: QuestionBatch, answers: [UUID: String]) {
         guard let index = workspace.questions.firstIndex(where: { $0.id == batch.id }) else { return }

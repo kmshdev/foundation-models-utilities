@@ -8,6 +8,32 @@ private func task(_ id: String, path: String, dependencies: [String] = []) -> Wo
           handoff: "Share commit, changed files, test commands and results.")
 }
 
+@Test func outcomeThreadsDoNotMixMessagesOrCreateExtraOutcomes() throws {
+    var workspace = Workspace()
+    let first = try workspace.recordOutcome("First outcome")
+    let second = try workspace.recordOutcome("Second outcome")
+    try workspace.recordMessage("  Prioritize accessibility  ", for: first)
+    try workspace.attach(.init(summary: "Second plan", tasks: [task("b", path: "B")]), to: second)
+    #expect(workspace.outcomes.count == 2)
+    #expect(workspace.messages.filter { $0.outcomeID == first }.map(\.text) == ["First outcome", "Prioritize accessibility"])
+    #expect(workspace.messages.filter { $0.outcomeID == second }.map(\.text) == ["Second outcome", "Second plan"])
+    let unchanged = workspace
+    #expect(throws: WorkspaceError.emptyMessage) { try workspace.recordMessage(" \n ", for: first) }
+    #expect(throws: WorkspaceError.missingOutcome) { try workspace.recordMessage("Hello", for: UUID()) }
+    #expect(workspace == unchanged)
+    #expect(try JSONDecoder().decode(Workspace.self, from: JSONEncoder().encode(workspace)) == workspace)
+}
+
+@Test func legacyMessagesRemainReadableWithoutGuessingAnOutcome() throws {
+    let message = RoomMessage(author: .user, text: "Earlier conversation")
+    let data = try JSONEncoder().encode(message)
+    var fields = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    fields.removeValue(forKey: "outcomeID")
+    let restored = try JSONDecoder().decode(RoomMessage.self, from: JSONSerialization.data(withJSONObject: fields))
+    #expect(restored.outcomeID == nil)
+    #expect(restored.text == message.text)
+}
+
 @Test func rejectsOverlappingApplePaths() {
     for paths in [("Sources/Room.swift", "sources/room.swift"), ("Apps", "Apps/Room.swift"),
                   ("Sources/Caf\u{00e9}.swift", "Sources/Cafe\u{0301}.swift")] {

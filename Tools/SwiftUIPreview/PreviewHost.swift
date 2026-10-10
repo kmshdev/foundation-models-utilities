@@ -21,22 +21,39 @@ private final class CaptureDelegate: NSObject, NSApplicationDelegate {
             do {
                 let output = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
                 try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
-                let store = StudioStore(preview: Workspace())
-                try await capture(StudioRootView(store: store), name: "01-engineering", height: 820, output: output)
-                try await capture(StudioRootView(store: store, initialSection: .team), name: "02-team", height: 1060, output: output)
-                let plan = WorkPlan(summary: "Example assignment plan for the native engineering workspace. Preview data only.", tasks: [
-                    WorkTask(id: "ui-01", title: "Build the engineering conversation", owner: .interface,
+                var workspace = Workspace()
+                let outcomeID = try workspace.recordOutcome("Build coordinator")
+                let plan = WorkPlan(summary: "Four independent scopes are ready for assignment. This is preview data; no work has been dispatched.", tasks: [
+                    WorkTask(id: "ui-01", title: "Outcome intake", owner: .interface,
                              paths: ["Apps/EngineeringStudio/Features/EngineeringRoomView.swift"],
-                             acceptance: ["Compose and save an outcome on iPhone and Mac.", "Keep text readable with larger Dynamic Type settings."],
-                             dependencies: [], handoff: "Share the commit, changed view, accessibility checks and test results with the testing specialist."),
-                    WorkTask(id: "qa-01", title: "Verify the outcome workflow", owner: .quality,
+                             acceptance: ["Save messages with the selected outcome."],
+                             dependencies: [], handoff: "Share the conversation flow and accessibility checks with Testing."),
+                    WorkTask(id: "core-01", title: "Task ownership", owner: .architecture,
+                             paths: ["Packages/EngineeringCore/Sources/EngineeringCore/TaskOwnership.swift"],
+                             acceptance: ["Assign one active owner to each task.", "Reject duplicate claims."],
+                             dependencies: [], handoff: "Architecture → Testing. Share the ownership contract, changed files and test commands."),
+                    WorkTask(id: "qa-01", title: "Handoff validation", owner: .quality,
                              paths: ["Tests/EngineeringStudioUITests"],
-                             acceptance: ["Verify persistence after relaunch and report any blockers."],
-                             dependencies: ["ui-01"], handoff: "Provide the tested commit, reproducible test commands and results to integration.")
+                             acceptance: ["Validate the ownership contract."],
+                             dependencies: ["core-01"], handoff: "Provide reproducible test commands and results to Integration."),
+                    WorkTask(id: "nav-01", title: "Native navigation", owner: .platforms,
+                             paths: ["Apps/EngineeringStudio/Features/StudioRootView.swift"],
+                             acceptance: ["Preserve selection as columns resize."],
+                             dependencies: [], handoff: "Share Mac and iPhone navigation captures with Testing.")
                 ])
-                try PlanValidator.validate(plan)
-                try await capture(NavigationStack { PlanDetailView(plan: plan) }, name: "03-assignments", height: 1120, output: output)
-                print("Captured three native SwiftUI previews. No model, developer or repository service was connected.")
+                try workspace.attach(plan, to: outcomeID)
+                try workspace.recordMessage("Prioritize handoff validation next.", for: outcomeID)
+                let store = StudioStore(preview: workspace)
+                try await capture(StudioRootView(store: store, initialOutcomeID: outcomeID, initialTaskID: "core-01"),
+                                  name: "01-workspace", width: 1440, height: 960, output: output)
+                try await capture(StudioRootView(store: store, initialOutcomeID: outcomeID, initialTaskID: "core-01"),
+                                  name: "02-compact-workspace", width: 1080, height: 760, output: output)
+                try await capture(StudioRootView(store: StudioStore(preview: Workspace())),
+                                  name: "03-empty-workspace", width: 1280, height: 820, output: output)
+                try await capture(StudioRootView(store: store, initialOutcomeID: outcomeID, initialTaskID: "core-01")
+                    .environment(\.accessibilityReduceTransparency, true).environment(\.colorSchemeContrast, .increased),
+                                  name: "04-increased-contrast", width: 1440, height: 960, output: output)
+                print("Captured real native SwiftUI views with preview data. Services disabled.")
                 NSApp.terminate(nil)
             } catch {
                 fputs("Screenshot capture failed: \(error)\n", stderr)
@@ -45,25 +62,19 @@ private final class CaptureDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func capture<Content: View>(_ content: Content, name: String, height: CGFloat, output: URL) async throws {
-        let root = VStack(spacing: 0) {
-            HStack {
-                Text("NATIVE SWIFTUI PREVIEW").font(.caption.monospaced().weight(.semibold))
-                Spacer()
-                Text("macOS 26 · Services disabled").font(.caption.monospaced())
-            }
-            .foregroundStyle(.white).padding(.horizontal, 20).padding(.vertical, 12)
-            .background(Color.black)
-            content
-        }
-        .frame(width: 1120, height: height)
-        .preferredColorScheme(.light)
-        .tint(StudioStyle.accent)
+    private func capture<Content: View>(_ content: Content, name: String, width: CGFloat, height: CGFloat, output: URL) async throws {
+        let root = content
+            .frame(width: width, height: height)
+            .preferredColorScheme(.dark)
+            .tint(.blue)
         let host = NSHostingView(rootView: root)
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1120, height: height),
-                              styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: width, height: height),
+                              styleMask: [.titled, .closable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
-        window.title = "Engineering Studio — UI Preview"
+        window.title = "Engineering Studio — Preview data · Services disabled"
+        window.titlebarAppearsTransparent = true
+        window.toolbarStyle = .unified
+        window.appearance = NSAppearance(named: .darkAqua)
         window.contentView = host
         window.center()
         window.makeKeyAndOrderFront(nil)
@@ -71,8 +82,6 @@ private final class CaptureDelegate: NSObject, NSApplicationDelegate {
         try await Task.sleep(for: .seconds(2))
         host.layoutSubtreeIfNeeded()
         host.displayIfNeeded()
-        // AppKit's view bitmap cache omits composited sidebar/control layers.
-        // Capture the real window through macOS so those layers are included.
         let destination = output.appendingPathComponent(name + ".png")
         let capture = Process()
         capture.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")

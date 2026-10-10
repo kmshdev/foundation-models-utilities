@@ -65,8 +65,11 @@ public struct RoomMessage: Identifiable, Codable, Sendable, Equatable {
     public let author: Author
     public let text: String
     public let createdAt: Date
-    public init(id: UUID = UUID(), author: Author, text: String, createdAt: Date = .now) {
+    /// Optional for compatibility with workspaces written before outcome threads.
+    public let outcomeID: UUID?
+    public init(id: UUID = UUID(), author: Author, text: String, createdAt: Date = .now, outcomeID: UUID? = nil) {
         self.id = id; self.author = author; self.text = text; self.createdAt = createdAt
+        self.outcomeID = outcomeID
     }
 }
 
@@ -98,7 +101,7 @@ public struct Workspace: Codable, Sendable, Equatable {
         guard !text.isEmpty else { throw WorkspaceError.emptyOutcome }
         let outcome = Outcome(text: text)
         outcomes.append(outcome)
-        messages.append(.init(author: .user, text: text))
+        messages.append(.init(author: .user, text: text, outcomeID: outcome.id))
         revision += 1
         return outcome.id
     }
@@ -107,16 +110,25 @@ public struct Workspace: Codable, Sendable, Equatable {
         try PlanValidator.validate(plan)
         guard let index = outcomes.firstIndex(where: { $0.id == id }) else { throw WorkspaceError.missingOutcome }
         outcomes[index].plan = plan
-        messages.append(.init(author: .coordinator, text: plan.summary))
+        messages.append(.init(author: .coordinator, text: plan.summary, outcomeID: id))
+        revision += 1
+    }
+
+    public mutating func recordMessage(_ input: String, for outcomeID: UUID) throws {
+        guard outcomes.contains(where: { $0.id == outcomeID }) else { throw WorkspaceError.missingOutcome }
+        let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { throw WorkspaceError.emptyMessage }
+        messages.append(.init(author: .user, text: text, outcomeID: outcomeID))
         revision += 1
     }
 }
 
 public enum WorkspaceError: Error, LocalizedError, Equatable {
-    case emptyOutcome, missingOutcome, unsupportedVersion(Int), staleRevision, duplicateRevision
+    case emptyOutcome, emptyMessage, missingOutcome, unsupportedVersion(Int), staleRevision, duplicateRevision
     public var errorDescription: String? {
         switch self {
         case .emptyOutcome: "Describe an outcome before adding it."
+        case .emptyMessage: "Write a message before sending it."
         case .missingOutcome: "The outcome could not be found."
         case .unsupportedVersion(let version): "This workspace uses version \(version). Update the app to open it."
         case .staleRevision: "A newer workspace is already saved. Reload before saving."

@@ -9,7 +9,9 @@ struct EngineeringStudioApp: App {
                 .task { await store.load() }
         }
         #if os(macOS)
-        .defaultSize(width: 1120, height: 780)
+        .defaultSize(width: 1440, height: 960)
+        .windowToolbarStyle(.unified)
+        .commands { SidebarCommands() }
         #endif
     }
 }

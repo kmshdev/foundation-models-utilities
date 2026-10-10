@@ -2,105 +2,219 @@ import EngineeringCore
 import SwiftUI
 
 struct EngineeringRoomView: View {
-    @Bindable var store: StudioStore
+    let store: StudioStore
+    let outcome: Outcome
+    @Binding var selectedTaskID: String?
     @State private var draft = ""
+    @State private var showsTasks = false
+
+    private var messages: [RoomMessage] { store.workspace.messages.filter { $0.outcomeID == outcome.id } }
+    private var questions: [QuestionBatch] {
+        store.workspace.questions.filter { $0.outcomeID == outcome.id && !$0.isComplete }
+    }
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 22) {
-                    StudioHeading(eyebrow: "Workspace / 01", title: "A place for the work.",
-                                  detail: "Give your team an outcome. Keep its requirements, questions and handoffs together.")
-                    StatusStrip()
-                    if store.workspace.messages.isEmpty {
-                        VStack(alignment: .leading, spacing: 16) {
-                            SectionEyebrow(text: "Start with an outcome")
-                            Text("What should we build?").font(.title2)
-                            Text("Outcomes are saved on this device. Planning can use Apple Intelligence when you enable it in Settings. Developer execution is not connected yet.")
-                                .foregroundStyle(.secondary)
-                            Button("Add the coordinator outcome", systemImage: "plus") {
-                                _ = store.submit("Build the engineering coordinator and team workflow as a native SwiftUI app for iOS 27 and macOS 27.")
-                            }
-                            .buttonStyle(.bordered).disabled(!store.isLoaded)
-                        }.padding(.vertical, 22)
-                    }
-                    ForEach(store.workspace.messages) { message in
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                SectionEyebrow(text: message.author == .user ? "You / Outcome" : "Coordinator")
-                                Spacer()
-                                Text(message.createdAt, style: .time).font(.caption.monospaced()).foregroundStyle(.secondary)
-                            }
-                            Text(message.text).textSelection(.enabled)
-                        }
-                        .padding(.vertical, 10).id(message.id)
-                        .overlay(alignment: .bottom) { Divider() }
-                    }
-                    ForEach(store.workspace.questions.filter { !$0.isComplete }) { batch in
-                        QuestionBatchView(batch: batch) { store.answer(batch, answers: $0) }
-                    }
-                    if let outcome = store.workspace.outcomes.last {
-                        OutcomeSummary(outcome: outcome, store: store)
-                    }
-                    Text(store.saveState).font(.caption).foregroundStyle(.secondary)
-                        .accessibilityLabel("Workspace status: \(store.saveState)")
-                    if store.saveState == "Changes not saved" { Button("Retry saving") { store.retrySave() } }
-                    Color.clear.frame(height: 1).id("end")
-                }
-                .padding(.horizontal, 24).padding(.bottom, 20)
-                .frame(maxWidth: 840).frame(maxWidth: .infinity)
+        VStack(spacing: 0) {
+            Picker("Outcome view", selection: $showsTasks) {
+                Text("Conversation").tag(false)
+                Text("Tasks").tag(true)
             }
-            .onChange(of: store.workspace.messages.count) { _, _ in proxy.scrollTo("end", anchor: .bottom) }
+            .pickerStyle(.segmented).frame(maxWidth: 330).padding(.vertical, 12)
+
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 24) {
+                        if !showsTasks {
+                            Text(outcome.createdAt, style: .date)
+                                .font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity)
+                            if messages.isEmpty {
+                                // Legacy workspaces preserve the outcome without guessing message ownership.
+                                Text(outcome.text).textSelection(.enabled)
+                            }
+                            ForEach(messages) { message in MessageRow(message: message).id(message.id) }
+                        }
+                        if let plan = outcome.plan {
+                            TaskSummaryView(tasks: plan.tasks, selectedTaskID: $selectedTaskID)
+                        }
+                        ForEach(questions) { batch in
+                            QuestionBatchView(batch: batch) { store.answer(batch, answers: $0) }
+                        }
+                        OutcomeSummary(outcome: outcome, store: store)
+                        HStack {
+                            Label(store.saveState, systemImage: "internaldrive")
+                            if store.saveState == "Changes not saved" {
+                                Button("Retry") { store.retrySave() }
+                            }
+                        }.font(.caption).foregroundStyle(.secondary)
+                        Color.clear.frame(height: 1).id("end")
+                    }.padding(20)
+                }
+                .onChange(of: messages.count) { _, _ in proxy.scrollTo("end", anchor: .bottom) }
+            }
         }
-        .background(StudioStyle.paper)
-        .navigationTitle("Engineering")
-        .safeAreaInset(edge: .bottom) { composer }
+        .safeAreaInset(edge: .bottom, spacing: 0) { composer }
     }
 
     private var composer: some View {
-        HStack(alignment: .bottom, spacing: 12) {
-            TextField("Describe an outcome…", text: $draft, axis: .vertical)
-                .lineLimit(1...5).textFieldStyle(.plain)
-                .accessibilityLabel("Outcome for the engineering team")
-                .padding(.vertical, 10)
-            Button("Add outcome", systemImage: "arrow.up") {
-                if store.submit(draft) { draft = "" }
+        VStack(alignment: .leading, spacing: 8) {
+            GlassEffectContainer {
+                HStack(alignment: .bottom, spacing: 12) {
+                    TextField("Direct the team…", text: $draft, axis: .vertical)
+                        .lineLimit(1...5).textFieldStyle(.plain).padding(.vertical, 8)
+                        .accessibilityLabel("Message for this outcome")
+                    Button("Send", systemImage: "arrow.up") {
+                        if store.send(draft, to: outcome.id) { draft = "" }
+                    }
+                    .buttonStyle(.glassProminent).tint(.blue)
+                    .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !store.isLoaded)
+                    .keyboardShortcut(.return, modifiers: .command)
+                }
+                .padding(12).glassEffect(.regular, in: .rect(cornerRadius: 24))
             }
-            .labelStyle(.iconOnly).buttonStyle(.glassProminent)
-            .controlSize(.large)
-            .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !store.isLoaded)
-            .keyboardShortcut(.return, modifiers: .command)
+            Text("Messages are saved locally and used when you prepare a plan.")
+                .font(.caption2).foregroundStyle(.secondary).padding(.horizontal, 8)
+        }.padding(12)
+    }
+}
+
+struct MessageRow: View {
+    let message: RoomMessage
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: message.author == .user ? "person.crop.circle.fill" : "sparkles")
+                .font(.title3).frame(width: 36, height: 36)
+                .background(.thinMaterial, in: .circle).accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 7) {
+                HStack(spacing: 10) {
+                    Text(message.author == .user ? "You" : "Coordinator · AI").font(.headline)
+                    Text(message.createdAt, style: .time).font(.caption).foregroundStyle(.secondary)
+                }
+                Text(message.text).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }.accessibilityElement(children: .combine)
+    }
+}
+
+struct TaskSummaryView: View {
+    let tasks: [WorkTask]
+    @Binding var selectedTaskID: String?
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Task").frame(maxWidth: .infinity, alignment: .leading)
+                Text("Status")
+            }.font(.caption).foregroundStyle(.secondary).padding(12)
+            ForEach(tasks) { task in
+                Divider()
+                Button {
+                    selectedTaskID = task.id
+                } label: {
+                    HStack(spacing: 10) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(task.title).font(.body.weight(.medium))
+                            Text(task.owner.title).font(.caption).foregroundStyle(.secondary)
+                        }.frame(maxWidth: .infinity, alignment: .leading)
+                        Label("Planned", systemImage: "circle.dashed").font(.caption).foregroundStyle(.secondary)
+                    }
+                    .padding(12).contentShape(.rect)
+                    .background(selectedTaskID == task.id ? Color.accentColor.opacity(0.24) : .clear)
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(selectedTaskID == task.id ? [.isSelected] : [])
+                .accessibilityHint("Show scope and handoff in task details")
+            }
         }
-        .padding(12).glassEffect(.regular, in: .rect(cornerRadius: 24))
-        .padding(.horizontal, 18).padding(.vertical, 10)
-        .frame(maxWidth: 860).frame(maxWidth: .infinity)
+        .background(.thinMaterial, in: .rect(cornerRadius: 16))
+        .clipShape(.rect(cornerRadius: 16))
     }
 }
 
 struct OutcomeSummary: View {
     let outcome: Outcome
-    @Bindable var store: StudioStore
+    let store: StudioStore
     private var waiting: Bool { store.workspace.questions.contains { $0.outcomeID == outcome.id && !$0.isComplete } }
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SectionEyebrow(text: outcome.plan == nil ? "Next / Assignment plan" : "Assignment plan")
-            if let plan = outcome.plan {
-                Text("\(plan.tasks.count) scoped tasks").font(.title3)
-                NavigationLink("View assignments and handoffs") { PlanDetailView(plan: plan) }
-                Text("Plan saved. No tasks have been dispatched.").font(.caption).foregroundStyle(.secondary)
+            if store.planningOutcomeID == outcome.id {
+                HStack { ProgressView().controlSize(.small); Text("Preparing assignments…") }
+                Button("Cancel Planning", systemImage: "stop.fill") { store.cancelPlanning() }
+                    .buttonStyle(.glass).tint(.orange)
             } else if waiting {
-                Label("Waiting for your answers above", systemImage: "bubble.left.and.text.bubble.right")
-            } else if store.isPlanning {
-                HStack { ProgressView(); Text("Preparing assignments…"); Spacer(); Button("Cancel") { store.cancelPlanning() } }
+                Label("Waiting for your answers", systemImage: "bubble.left.and.text.bubble.right")
             } else if store.usesOnDeviceModel {
-                Button("Prepare assignment plan", systemImage: "sparkles") { store.plan(outcome) }.buttonStyle(.borderedProminent)
-            } else {
-                Text("Enable on-device planning in Settings to prepare assignments. Your requested ChatGPT subscription connection is not implemented yet.")
+                Button(outcome.plan == nil ? "Prepare Plan" : "Update Plan", systemImage: "play.fill") { store.plan(outcome) }
+                    .buttonStyle(.glassProminent).tint(.green).disabled(store.isPlanning)
+            } else if outcome.plan == nil {
+                Text("Enable Apple Intelligence in Settings to prepare assignments on this device.")
                     .foregroundStyle(.secondary)
             }
-        }.padding(.vertical, 12)
+            Label(outcome.plan == nil ? "Developer execution is not connected." : "Plan saved · Tasks have not been dispatched.",
+                  systemImage: "network.slash")
+                .font(.caption).foregroundStyle(.secondary)
+        }
     }
 }
 
+struct TaskDetailView: View {
+    let task: WorkTask
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: task.owner.symbol).font(.title2)
+                        .frame(width: 44, height: 44).background(.thinMaterial, in: .rect(cornerRadius: 12))
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text(task.title).font(.title3.weight(.semibold)).accessibilityAddTraits(.isHeader)
+                        Text("Planned · \(task.owner.title)").font(.callout).foregroundStyle(.secondary)
+                    }
+                }
+                Divider()
+                detailSection("Scope", symbol: "doc.text") {
+                    ForEach(task.paths, id: \.self) { Text($0).font(.callout.monospaced()).textSelection(.enabled) }
+                }
+                Divider()
+                detailSection("Acceptance criteria", symbol: "checklist") {
+                    ForEach(task.acceptance, id: \.self) { criterion in
+                        Label(criterion, systemImage: "circle").fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                Divider()
+                detailSection("Handoff", symbol: "arrow.triangle.branch") {
+                    Text(task.handoff).textSelection(.enabled)
+                    if !task.dependencies.isEmpty {
+                        Text("Depends on: \(task.dependencies.joined(separator: ", "))").font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                Divider()
+                detailSection("Verification", symbol: "checkmark.seal") {
+                    Text("Tests have not run").font(.headline)
+                    Text("No test runner or pull request is connected to this task.").foregroundStyle(.secondary)
+                }
+                ViewThatFits(in: .horizontal) {
+                    HStack { testButton; pullRequestButton }
+                    VStack(alignment: .leading) { testButton; pullRequestButton }
+                }
+            }.padding(20).frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .navigationTitle("Task details")
+    }
+    private var testButton: some View {
+        Button("Run Tests", systemImage: "play.fill") { }
+            .buttonStyle(.glassProminent).tint(.green).disabled(true)
+            .help("Connect a test runner to run and verify tests")
+    }
+    private var pullRequestButton: some View {
+        Button("Open PR", systemImage: "arrow.up.right") { }
+            .buttonStyle(.glass).disabled(true).help("No pull request exists for this task")
+    }
+    private func detailSection<Content: View>(_ title: String, symbol: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(title, systemImage: symbol).font(.headline)
+            content()
+        }
+    }
+}
 struct QuestionBatchView: View {
     let batch: QuestionBatch
     let submit: ([UUID: String]) -> Void
@@ -111,7 +225,7 @@ struct QuestionBatchView: View {
             ForEach(batch.questions) { question in
                 VStack(alignment: .leading, spacing: 10) {
                     Text(question.prompt).font(.headline)
-                    ForEach(Array(question.options.enumerated()), id: \.offset) { _, option in
+                    ForEach(question.options, id: \.self) { option in
                         Button {
                             answers[question.id] = option
                         } label: {
