@@ -62,6 +62,7 @@ struct StudioRootView: View {
                     }
                 }.padding(.leading, 92)
             }.sharedBackgroundVisibility(.hidden)
+            ToolbarSpacer(.flexible, placement: .primaryAction)
             ToolbarItem(placement: .primaryAction) {
                 GlassEffectContainer(spacing: 12) {
                     HStack(spacing: 12) {
@@ -75,7 +76,7 @@ struct StudioRootView: View {
                         Button { sheet = .newOutcome } label: {
                             Image(systemName: "square.and.pencil").font(.system(size: 18)).frame(width: 24, height: 28)
                         }
-                        .buttonStyle(.glass).buttonBorderShape(.circle)
+                        .buttonStyle(.glass).buttonBorderShape(.circle).tint(.gray)
                         .keyboardShortcut("n", modifiers: .command)
                         .accessibilityLabel("New outcome").help("Start a new outcome")
                         Button {
@@ -85,6 +86,7 @@ struct StudioRootView: View {
                                   systemImage: store.isPlanning ? "stop.fill" : "pause.fill")
                                 .font(.system(size: 15, weight: .medium)).padding(.horizontal, 6).frame(height: 28)
                         }
+                        .labelStyle(.titleAndIcon)
                         .buttonStyle(.glass).tint(.orange).disabled(!store.isPlanning)
                         .help(store.isPlanning ? "Cancel planning" : "Developer execution is not connected yet")
                         Menu {
@@ -145,12 +147,12 @@ struct StudioRootView: View {
         #if os(macOS)
         HSplitView {
             sidebar
-                .frame(minWidth: 230, idealWidth: 258, maxWidth: 300)
+                .frame(minWidth: 220, idealWidth: 258, maxWidth: 258)
             conversationColumn
                 .frame(minWidth: 430, idealWidth: 610, maxWidth: .infinity)
                 .padding(.horizontal, 10)
             detailColumn
-                .frame(minWidth: 320, idealWidth: 368, maxWidth: 420)
+                .frame(minWidth: 300, idealWidth: 368, maxWidth: 368)
         }
         .padding(.horizontal, 16).padding(.top, 10).padding(.bottom, 20)
         #else

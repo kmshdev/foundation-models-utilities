@@ -22,6 +22,8 @@ private final class CaptureDelegate: NSObject, NSApplicationDelegate {
                 let output = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
                 try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
                 var workspace = Workspace()
+                _ = try workspace.recordOutcome("Native navigation")
+                _ = try workspace.recordOutcome("Model access")
                 let outcomeID = try workspace.recordOutcome("Build coordinator")
                 let plan = WorkPlan(summary: "Intake and ownership can proceed together.", tasks: [
                     WorkTask(id: "ui-01", title: "Outcome intake", owner: .interface,
@@ -42,8 +44,6 @@ private final class CaptureDelegate: NSObject, NSApplicationDelegate {
                              dependencies: [], handoff: "Share Mac and iPhone navigation captures with Testing.")
                 ])
                 try workspace.attach(plan, to: outcomeID)
-                _ = try workspace.recordOutcome("Model access")
-                _ = try workspace.recordOutcome("Native navigation")
                 workspace.messages = [
                     RoomMessage(author: .user, text: "Start with outcome intake and task ownership.", outcomeID: outcomeID),
                     RoomMessage(author: .coordinator, text: plan.summary, outcomeID: outcomeID)

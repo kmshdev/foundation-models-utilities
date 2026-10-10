@@ -24,7 +24,7 @@ struct WorkspacePanel: ViewModifier {
     @Environment(\.colorSchemeContrast) private var contrast
     func body(content: Content) -> some View {
         content
-            .background(.ultraThinMaterial, in: .rect(cornerRadius: 20))
+            .background(.thinMaterial, in: .rect(cornerRadius: 20))
             .overlay {
                 RoundedRectangle(cornerRadius: 20)
                     .strokeBorder(.white.opacity(contrast == .increased ? 0.55 : 0.17), lineWidth: 1)
