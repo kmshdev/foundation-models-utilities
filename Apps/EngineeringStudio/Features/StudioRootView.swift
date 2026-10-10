@@ -11,6 +11,7 @@ private enum StudioSheet: String, Identifiable {
 
 struct StudioRootView: View {
     @Bindable var store: StudioStore
+    private let initialDraft: String
     @State private var destination: WorkspaceDestination?
     @State private var selectedTaskID: String?
     @State private var columns: NavigationSplitViewVisibility = .all
@@ -19,8 +20,9 @@ struct StudioRootView: View {
     @State private var search = ""
 
     /// One-time selection seeds for self-contained SwiftUI previews.
-    init(store: StudioStore, initialOutcomeID: UUID? = nil, initialTaskID: String? = nil) {
+    init(store: StudioStore, initialOutcomeID: UUID? = nil, initialTaskID: String? = nil, initialDraft: String = "") {
         self.store = store
+        self.initialDraft = initialDraft
         _destination = State(initialValue: initialOutcomeID.map(WorkspaceDestination.outcome) ?? .all)
         _selectedTaskID = State(initialValue: initialTaskID)
     }
@@ -49,7 +51,7 @@ struct StudioRootView: View {
         } content: {
             Group {
                 if let outcome {
-                    EngineeringRoomView(store: store, outcome: outcome, selectedTaskID: $selectedTaskID)
+                    EngineeringRoomView(store: store, outcome: outcome, selectedTaskID: $selectedTaskID, initialDraft: initialDraft)
                         .id(outcome.id)
                 } else {
                     outcomeList

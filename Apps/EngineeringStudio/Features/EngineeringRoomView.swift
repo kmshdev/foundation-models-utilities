@@ -5,8 +5,16 @@ struct EngineeringRoomView: View {
     let store: StudioStore
     let outcome: Outcome
     @Binding var selectedTaskID: String?
-    @State private var draft = ""
+    @State private var draft: String
     @State private var showsTasks = false
+
+    /// A one-time draft seed for previewing the enabled Send state.
+    init(store: StudioStore, outcome: Outcome, selectedTaskID: Binding<String?>, initialDraft: String = "") {
+        self.store = store
+        self.outcome = outcome
+        _selectedTaskID = selectedTaskID
+        _draft = State(initialValue: initialDraft)
+    }
 
     private var messages: [RoomMessage] { store.workspace.messages.filter { $0.outcomeID == outcome.id } }
     private var questions: [QuestionBatch] {

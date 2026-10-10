@@ -44,7 +44,7 @@ private final class CaptureDelegate: NSObject, NSApplicationDelegate {
                 try workspace.attach(plan, to: outcomeID)
                 try workspace.recordMessage("Prioritize handoff validation next.", for: outcomeID)
                 let store = StudioStore(preview: workspace)
-                try await capture(StudioRootView(store: store, initialOutcomeID: outcomeID, initialTaskID: "core-01"),
+                try await capture(StudioRootView(store: store, initialOutcomeID: outcomeID, initialTaskID: "core-01", initialDraft: "Prioritize handoff validation next."),
                                   name: "01-workspace", width: 1440, height: 960, output: output)
                 try await capture(StudioRootView(store: store, initialOutcomeID: outcomeID, initialTaskID: "core-01"),
                                   name: "02-compact-workspace", width: 1080, height: 760, output: output)
