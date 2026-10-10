@@ -117,7 +117,7 @@ struct TaskSummaryView: View {
                         Label("Planned", systemImage: "circle.dashed").font(.caption).foregroundStyle(.secondary)
                     }
                     .padding(12).contentShape(.rect)
-                    .background(selectedTaskID == task.id ? Color.accentColor.opacity(0.24) : .clear)
+                    .background(selectedTaskID == task.id ? Color.blue.opacity(0.24) : .clear)
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(selectedTaskID == task.id ? [.isSelected] : [])

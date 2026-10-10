@@ -50,9 +50,8 @@ private final class CaptureDelegate: NSObject, NSApplicationDelegate {
                                   name: "02-compact-workspace", width: 1080, height: 760, output: output)
                 try await capture(StudioRootView(store: StudioStore(preview: Workspace())),
                                   name: "03-empty-workspace", width: 1280, height: 820, output: output)
-                try await capture(StudioRootView(store: store, initialOutcomeID: outcomeID, initialTaskID: "core-01")
-                    .environment(\.accessibilityReduceTransparency, true).environment(\.colorSchemeContrast, .increased),
-                                  name: "04-increased-contrast", width: 1440, height: 960, output: output)
+                try await capture(StudioRootView(store: store, initialOutcomeID: outcomeID, initialTaskID: "core-01"),
+                                  name: "04-increased-contrast", width: 1440, height: 960, output: output, highContrast: true)
                 print("Captured real native SwiftUI views with preview data. Services disabled.")
                 NSApp.terminate(nil)
             } catch {
@@ -62,7 +61,7 @@ private final class CaptureDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func capture<Content: View>(_ content: Content, name: String, width: CGFloat, height: CGFloat, output: URL) async throws {
+    private func capture<Content: View>(_ content: Content, name: String, width: CGFloat, height: CGFloat, output: URL, highContrast: Bool = false) async throws {
         let root = content
             .frame(width: width, height: height)
             .preferredColorScheme(.dark)
@@ -74,7 +73,7 @@ private final class CaptureDelegate: NSObject, NSApplicationDelegate {
         window.title = "Engineering Studio — Preview data · Services disabled"
         window.titlebarAppearsTransparent = true
         window.toolbarStyle = .unified
-        window.appearance = NSAppearance(named: .darkAqua)
+        window.appearance = NSAppearance(named: highContrast ? .accessibilityHighContrastDarkAqua : .darkAqua)
         window.contentView = host
         window.center()
         window.makeKeyAndOrderFront(nil)

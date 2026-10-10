@@ -106,6 +106,9 @@ struct StudioRootView: View {
             StudioSheetView(kind: item, store: store)
         }
         .onChange(of: destination) { _, _ in selectedTaskID = nil }
+        .onChange(of: search) { _, query in
+            if !query.isEmpty { destination = .all; compactColumn = .content }
+        }
         .onChange(of: selectedTaskID) { _, id in
             if id != nil { compactColumn = .detail }
         }
@@ -164,7 +167,7 @@ struct StudioRootView: View {
                 } label: {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(item.text).font(.headline)
-                        Text(item.plan == nil ? "Awaiting a plan" : "\(item.plan!.tasks.count) tasks · Not dispatched")
+                        Text(item.plan.map { "\($0.tasks.count) tasks · Not dispatched" } ?? "Awaiting a plan")
                             .font(.caption).foregroundStyle(.secondary)
                     }.padding(.vertical, 6)
                 }.buttonStyle(.plain)
