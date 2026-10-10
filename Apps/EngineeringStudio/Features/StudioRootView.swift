@@ -49,7 +49,7 @@ struct StudioRootView: View {
         .background { StudioBackdrop() }
         .preferredColorScheme(.dark)
         .font(.system(size: 16))
-        .tint(.blue)
+        .tint(StudioStyle.accent)
         #if os(macOS)
         .overlay(alignment: .bottomTrailing) {
             HStack(spacing: 6) {
@@ -64,13 +64,13 @@ struct StudioRootView: View {
             #if os(macOS)
             ToolbarItem(placement: .navigation) {
                 HStack(spacing: 12) {
-                    SymbolBadge(symbol: "doc.text", size: 38)
+                    SymbolBadge(symbol: "doc.text", size: 40)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(outcome.map { String($0.text.prefix(45)) } ?? "Engineering")
                             .font(.system(size: 18, weight: .semibold))
                         Text("Engineering").font(.system(size: 14)).foregroundStyle(.secondary)
                     }
-                }.padding(.leading, 92)
+                }.padding(.leading, 116)
             }.sharedBackgroundVisibility(.hidden)
             ToolbarSpacer(.flexible, placement: .primaryAction)
             ToolbarItem(placement: .primaryAction) {
@@ -84,9 +84,10 @@ struct StudioRootView: View {
                         .font(.system(size: 15)).padding(.horizontal, 14).frame(width: 164, height: 38)
                         .glassEffect(.regular, in: .capsule)
                         Button { sheet = .newOutcome } label: {
-                            Image(systemName: "square.and.pencil").font(.system(size: 18)).frame(width: 24, height: 28)
+                            Image(systemName: "square.and.pencil").font(.system(size: 18)).frame(width: 40, height: 40)
+                                .glassEffect(.regular.interactive(), in: .circle)
                         }
-                        .buttonStyle(.glass).buttonBorderShape(.circle).tint(.gray)
+                        .buttonStyle(.plain)
                         .keyboardShortcut("n", modifiers: .command)
                         .accessibilityLabel("New outcome").help("Start a new outcome")
                         Button {
@@ -95,6 +96,7 @@ struct StudioRootView: View {
                             Label(store.isPlanning ? "Cancel Planning" : "Pause Team",
                                   systemImage: store.isPlanning ? "stop.fill" : "pause.fill")
                                 .font(.system(size: 15, weight: .medium)).padding(.horizontal, 6).frame(height: 28)
+                                .foregroundStyle(.orange)
                         }
                         .labelStyle(.titleAndIcon)
                         .buttonStyle(.glass).tint(.orange).disabled(!store.isPlanning)
@@ -104,7 +106,8 @@ struct StudioRootView: View {
                             Button("Settings", systemImage: "gearshape") { sheet = .settings }
                                 .keyboardShortcut(",", modifiers: .command)
                         } label: {
-                            Image(systemName: "ellipsis").font(.system(size: 18)).frame(width: 24, height: 28)
+                            Image(systemName: "ellipsis").font(.system(size: 18)).frame(width: 40, height: 40)
+                                .glassEffect(.regular, in: .circle)
                         }
                         .menuIndicator(.hidden).buttonStyle(.glass).buttonBorderShape(.circle)
                         .accessibilityLabel("More options")
@@ -256,7 +259,7 @@ struct StudioRootView: View {
             .padding(.horizontal, 14).frame(minHeight: 43).contentShape(.rect)
             .background {
                 if destination == value {
-                    RoundedRectangle(cornerRadius: 11).fill(.blue.gradient)
+                    RoundedRectangle(cornerRadius: 11).fill(StudioStyle.accent.gradient)
                         .overlay { RoundedRectangle(cornerRadius: 11).strokeBorder(.white.opacity(0.24)) }
                 }
             }
@@ -358,7 +361,7 @@ private struct NewOutcomeView: View {
 }
 
 enum StudioStyle {
-    static let accent = Color.blue
+    static let accent = Color(red: 0.08, green: 0.35, blue: 0.94)
     static let paper = Color.clear
 }
 

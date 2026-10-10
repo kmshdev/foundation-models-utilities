@@ -19,6 +19,7 @@ struct EngineeringRoomView: View {
     private var messages: [RoomMessage] { store.workspace.messages.filter { $0.outcomeID == outcome.id } }
     private var questions: [QuestionBatch] { store.workspace.questions.filter { $0.outcomeID == outcome.id && !$0.isComplete } }
     private var selectedTask: WorkTask? { outcome.plan?.tasks.first { $0.id == selectedTaskID } }
+    private var canSend: Bool { !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && store.isLoaded }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -97,11 +98,11 @@ struct EngineeringRoomView: View {
                     if store.send(draft, to: outcome.id) { draft = "" }
                 } label: {
                     Label("Send", systemImage: "arrow.up").font(.system(size: 16, weight: .medium))
-                        .frame(minWidth: 88, minHeight: 38)
+                        .frame(width: 118, height: 50)
+                        .glassEffect(.regular.tint(StudioStyle.accent).interactive(), in: .rect(cornerRadius: 15))
                 }
-                .buttonStyle(.glassProminent).tint(.blue).controlSize(.large)
-                .buttonBorderShape(.roundedRectangle(radius: 15))
-                .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !store.isLoaded)
+                .buttonStyle(.plain).opacity(canSend ? 1 : 0.45)
+                .disabled(!canSend)
                 .keyboardShortcut(.return, modifiers: .command)
             }
             .padding(12).glassEffect(.regular, in: .rect(cornerRadius: 26))
@@ -253,7 +254,8 @@ struct TaskDetailView: View {
                 }
                 Divider().opacity(0.6)
                 detailSection("Handoff", symbol: "arrow.triangle.branch") {
-                    Text(task.handoff).font(.system(size: 16)).lineSpacing(5).textSelection(.enabled)
+                    Text(task.handoff.components(separatedBy: ". ").first ?? task.handoff)
+                        .font(.system(size: 16)).lineSpacing(5).textSelection(.enabled)
                     Text("Not dispatched").font(.system(size: 14)).foregroundStyle(.secondary)
                     if !task.dependencies.isEmpty {
                         Text("Depends on: \(task.dependencies.joined(separator: ", "))")
@@ -280,6 +282,9 @@ struct TaskDetailView: View {
                             Label(criterion, systemImage: "circle").fixedSize(horizontal: false, vertical: true)
                         }
                     }.font(.system(size: 15)).padding(.top, 12)
+                }.font(.system(size: 14)).foregroundStyle(.secondary)
+                DisclosureGroup("Handoff context") {
+                    Text(task.handoff).font(.system(size: 15)).lineSpacing(4).textSelection(.enabled).padding(.top, 10)
                 }.font(.system(size: 14)).foregroundStyle(.secondary)
             }.padding(24).padding(.top, 8).frame(maxWidth: .infinity, alignment: .leading)
         }
