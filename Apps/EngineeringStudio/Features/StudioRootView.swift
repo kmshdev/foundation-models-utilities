@@ -62,7 +62,6 @@ struct StudioRootView: View {
                     }
                 }.padding(.leading, 92)
             }.sharedBackgroundVisibility(.hidden)
-            #endif
             ToolbarItem(placement: .primaryAction) {
                 GlassEffectContainer(spacing: 12) {
                     HStack(spacing: 12) {
@@ -100,9 +99,25 @@ struct StudioRootView: View {
                     }
                 }
             }.sharedBackgroundVisibility(.hidden)
+            #else
+            ToolbarItem(placement: .primaryAction) {
+                Button("New outcome", systemImage: "square.and.pencil") { sheet = .newOutcome }
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Menu("More", systemImage: "ellipsis") {
+                    Button("Developers", systemImage: "person.2") { sheet = .team }
+                    Button("Settings", systemImage: "gearshape") { sheet = .settings }
+                    if store.isPlanning {
+                        Button("Cancel Planning", systemImage: "stop.fill") { store.cancelPlanning() }
+                    }
+                }
+            }
+            #endif
         }
         #if os(macOS)
         .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
+        #else
+        .searchable(text: $search, prompt: "Search outcomes")
         #endif
         .sheet(item: $sheet) { item in
             StudioSheetView(kind: item, store: store)

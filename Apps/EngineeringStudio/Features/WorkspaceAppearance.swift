@@ -21,7 +21,7 @@ struct StudioBackdrop: View {
 }
 
 struct WorkspacePanel: ViewModifier {
-    @Environment(\.accessibilityContrast) private var contrast
+    @Environment(\.colorSchemeContrast) private var contrast
     func body(content: Content) -> some View {
         content
             .background(.ultraThinMaterial, in: .rect(cornerRadius: 20))
