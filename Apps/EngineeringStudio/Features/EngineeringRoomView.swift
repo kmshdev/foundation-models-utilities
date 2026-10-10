@@ -18,7 +18,7 @@ struct EngineeringRoomView: View {
                 Text("Conversation").tag(false)
                 Text("Tasks").tag(true)
             }
-            .pickerStyle(.segmented).frame(maxWidth: 330).padding(.vertical, 12)
+            .pickerStyle(.segmented).labelsHidden().frame(maxWidth: 330).padding(.vertical, 12)
 
             ScrollViewReader { proxy in
                 ScrollView {
@@ -88,7 +88,7 @@ struct MessageRow: View {
                     Text(message.author == .user ? "You" : "Coordinator · AI").font(.headline)
                     Text(message.createdAt, style: .time).font(.caption).foregroundStyle(.secondary)
                 }
-                Text(message.text).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                Text(message.text).font(.system(size: 15)).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
         }.accessibilityElement(children: .combine)

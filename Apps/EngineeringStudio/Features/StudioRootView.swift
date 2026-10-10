@@ -55,6 +55,7 @@ struct StudioRootView: View {
                     outcomeList
                 }
             }
+            .background { StudioBackdrop().backgroundExtensionEffect() }
             .navigationTitle(outcome.map { String($0.text.prefix(55)) } ?? "Engineering")
             .navigationSplitViewColumnWidth(min: 340, ideal: 610)
         } detail: {
@@ -67,8 +68,9 @@ struct StudioRootView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(.regularMaterial, in: .rect(cornerRadius: 22))
+            .background(.thinMaterial, in: .rect(cornerRadius: 22))
             .padding(10)
+            .background { StudioBackdrop() }
             .navigationSplitViewColumnWidth(min: 275, ideal: 340, max: 470)
         }
         .navigationSplitViewStyle(.balanced)
@@ -261,7 +263,7 @@ struct StudioBackdrop: View {
         Rectangle().fill(.background)
             .overlay {
                 if !reduceTransparency {
-                    LinearGradient(colors: [.blue.opacity(0.13), .clear, .blue.opacity(0.08)],
+                    LinearGradient(colors: [.blue.opacity(0.19), .clear, .blue.opacity(0.13)],
                                    startPoint: .topLeading, endPoint: .bottomTrailing)
                 }
             }

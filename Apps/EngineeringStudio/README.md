@@ -8,7 +8,17 @@ A native SwiftUI workspace for a personal engineering coordinator and eight spec
 
 Open `EngineeringStudio.xcodeproj` in Xcode with the iOS 27/macOS 27 SDKs and Swift 6.4. Select `EngineeringStudioiOS` or `EngineeringStudioMac`, choose a simulator or Mac destination, and run. A physical device requires your signing team. On-device planning additionally requires an Apple Intelligence capable device with its model available.
 
-The app starts with an empty, local workspace. Add an outcome in Engineering. Outcomes and conversation history persist in Application Support. All eight specialties are honestly shown as offline until developer execution is connected.
+The app starts with an empty, local workspace. Use New Outcome to begin. Outcomes and conversation history persist in Application Support. All eight specialties are honestly shown as offline until developer execution is connected.
+
+## Workspace design
+
+The accepted design uses three native `NavigationSplitView` columns: outcomes, the selected outcome's conversation/tasks, and the selected task's details. Columns resize on Mac and adapt to compact navigation on iPhone. Task details occupy the third column rather than a modal overlay. New Outcome, Developers and Settings use system sheets.
+
+The dark window uses a continuous background, semantic standard materials for content, the native unified toolbar, and Liquid Glass for the composer and actions. Blue identifies Send, green identifies planning/run actions, and amber identifies cancellation/pause intent. Symbols and labels carry meaning alongside color. Execution and verification actions remain disabled with explanations until their services exist; a planned task never claims to be running or tested.
+
+Messages sent from an outcome are attached to that outcome and supplied as context when preparing its next plan. Legacy messages without an outcome ID remain accessible under All Outcomes, without guessing which thread they belong to. Search finds outcomes. Task selection is cleared when its outcome changes or a replacement plan removes that task.
+
+The Swift-only preview host in `Tools/SwiftUIPreview` compiles the real views and store using a disabled model service. Its screenshots are native UI with fixture data, not evidence of live bot execution. It also typechecks shared UI against the installed iOS simulator SDK; production SDK 27 validation is separate.
 
 You may explicitly enable optional on-device planning in Settings. It uses `LanguageModelSession.DynamicProfile`, the `LanguageModel` protocol, guided generation, typed error handling, and the utilities package's rolling history window. Model tool calling is disabled for this planning-only session. A generated plan is validated before it is saved. Any genuinely blocking questions appear together in the Engineering conversation; partial answers persist and planning waits for all answers in that batch.
 

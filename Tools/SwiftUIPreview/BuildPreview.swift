@@ -2,6 +2,7 @@
 // Builds a disposable screenshot host. Production project/SDK settings are not changed.
 import Foundation
 
+@discardableResult
 func run(_ arguments: [String], capture: Bool = false) throws -> String {
     let process = Process()
     process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
@@ -38,6 +39,18 @@ try run(["swiftc"] + common + ["-parse-as-library", "-emit-library", "-static", 
         "-emit-module-path", output.appendingPathComponent("EngineeringCore.swiftmodule").path, "-o", library]
         + sources("Packages/EngineeringCore/Sources/EngineeringCore"))
 let appSources = try sources("Apps/EngineeringStudio/Features") + sources("Apps/EngineeringStudio/Models")
+// Check the shared views against the installed iOS SDK as well. This does not
+// replace the production Swift 6.4 / SDK 27 build or execute the model service.
+let iosOutput = output.appendingPathComponent("ios", isDirectory: true)
+try FileManager.default.createDirectory(at: iosOutput, withIntermediateDirectories: true)
+let iosSDK = try run(["--sdk", "iphonesimulator", "--show-sdk-path"], capture: true)
+let iosCommon = ["-sdk", iosSDK, "-target", "arm64-apple-ios26.0-simulator", "-swift-version", "6", "-D", "DEBUG"]
+try run(["swiftc"] + iosCommon + ["-parse-as-library", "-emit-module", "-module-name", "EngineeringCore",
+        "-emit-module-path", iosOutput.appendingPathComponent("EngineeringCore.swiftmodule").path]
+        + sources("Packages/EngineeringCore/Sources/EngineeringCore"))
+try run(["swiftc"] + iosCommon + ["-typecheck", "-parse-as-library", "-I", iosOutput.path] + appSources + [
+        root.appendingPathComponent("Tools/SwiftUIPreview/PreviewPlanner.swift").path,
+        root.appendingPathComponent("Apps/EngineeringStudio/EngineeringStudioApp.swift").path])
 try run(["swiftc"] + common + ["-parse-as-library", "-I", output.path, "-L", output.path, "-lEngineeringCore",
         "-o", executables.appendingPathComponent("SwiftUIPreview").path] + appSources + [
         root.appendingPathComponent("Tools/SwiftUIPreview/PreviewPlanner.swift").path,
