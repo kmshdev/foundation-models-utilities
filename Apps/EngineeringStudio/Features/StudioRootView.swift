@@ -50,6 +50,16 @@ struct StudioRootView: View {
         .preferredColorScheme(.dark)
         .font(.system(size: 16))
         .tint(.blue)
+        #if os(macOS)
+        .overlay(alignment: .bottomTrailing) {
+            HStack(spacing: 6) {
+                Text(store.saveState)
+                if store.saveState == "Changes not saved" { Button("Retry") { store.retrySave() } }
+            }
+            .font(.system(size: 11)).foregroundStyle(.secondary)
+            .padding(.trailing, 20).padding(.bottom, 12)
+        }
+        #endif
         .toolbar {
             #if os(macOS)
             ToolbarItem(placement: .navigation) {
@@ -154,7 +164,7 @@ struct StudioRootView: View {
             detailColumn
                 .frame(minWidth: 300, idealWidth: 368, maxWidth: 368)
         }
-        .padding(.horizontal, 16).padding(.top, 10).padding(.bottom, 20)
+        .padding(.horizontal, 16).padding(.top, 10).padding(.bottom, 38)
         #else
         NavigationSplitView(columnVisibility: $columns, preferredCompactColumn: $compactColumn) {
             sidebar.navigationSplitViewColumnWidth(min: 230, ideal: 258, max: 300)

@@ -105,12 +105,14 @@ struct EngineeringRoomView: View {
                 .keyboardShortcut(.return, modifiers: .command)
             }
             .padding(12).glassEffect(.regular, in: .rect(cornerRadius: 26))
+            #if !os(macOS)
             HStack(spacing: 6) {
                 Image(systemName: "internaldrive")
                 Text(store.saveState)
                 Spacer()
                 if store.saveState == "Changes not saved" { Button("Retry") { store.retrySave() } }
             }.font(.system(size: 11)).foregroundStyle(.secondary).padding(.horizontal, 10)
+            #endif
         }
     }
 }

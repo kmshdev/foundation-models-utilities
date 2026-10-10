@@ -24,6 +24,10 @@ struct WorkspacePanel: ViewModifier {
     @Environment(\.colorSchemeContrast) private var contrast
     func body(content: Content) -> some View {
         content
+            .background {
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(LinearGradient(colors: [.white.opacity(0.07), .clear], startPoint: .topLeading, endPoint: .bottomTrailing))
+            }
             .background(.thinMaterial, in: .rect(cornerRadius: 20))
             .overlay {
                 RoundedRectangle(cornerRadius: 20)
@@ -43,6 +47,10 @@ struct SymbolBadge: View {
             .font(.system(size: size * 0.47, weight: .regular))
             .foregroundStyle(tint)
             .frame(width: size, height: size)
+            .background {
+                Circle().fill(LinearGradient(colors: [.white.opacity(0.20), .white.opacity(0.025)],
+                                             startPoint: .topLeading, endPoint: .bottomTrailing))
+            }
             .background(.thinMaterial, in: .circle)
             .overlay { Circle().strokeBorder(.white.opacity(0.17), lineWidth: 1) }
             .accessibilityHidden(true)
