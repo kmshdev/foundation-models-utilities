@@ -3,6 +3,8 @@ on:
   push:
     branches: [swift-app]
     paths:
+      - 'Apps/EngineeringStudio/**'
+      - 'Packages/EngineeringCore/Sources/**'
       - 'Tools/SwiftUIPreview/**'
       - '.github/workflows/screenshots.yml'
   workflow_dispatch:
