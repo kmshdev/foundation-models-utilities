@@ -45,63 +45,61 @@ struct StudioRootView: View {
     }
 
     var body: some View {
-        NavigationSplitView(columnVisibility: $columns, preferredCompactColumn: $compactColumn) {
-            sidebar
-                .navigationSplitViewColumnWidth(min: 190, ideal: 235, max: 300)
-        } content: {
-            Group {
-                if let outcome {
-                    EngineeringRoomView(store: store, outcome: outcome, selectedTaskID: $selectedTaskID, initialDraft: initialDraft)
-                        .id(outcome.id)
-                } else {
-                    outcomeList
-                }
-            }
-            .background { StudioBackdrop().backgroundExtensionEffect() }
-            .navigationTitle(outcome.map { String($0.text.prefix(55)) } ?? "Engineering")
-            .navigationSplitViewColumnWidth(min: 340, ideal: 610)
-        } detail: {
-            Group {
-                if let selectedTask {
-                    TaskDetailView(task: selectedTask)
-                } else {
-                    ContentUnavailableView("Select a task", systemImage: "sidebar.right",
-                                           description: Text("Its scope, requirements and handoff appear here."))
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(.thinMaterial, in: .rect(cornerRadius: 22))
-            .padding(10)
-            .background { StudioBackdrop() }
-            .navigationSplitViewColumnWidth(min: 275, ideal: 340, max: 470)
-        }
-        .navigationSplitViewStyle(.balanced)
+        workspaceColumns
         .background { StudioBackdrop() }
         .preferredColorScheme(.dark)
+        .font(.system(size: 16))
         .tint(.blue)
         .toolbar {
+            #if os(macOS)
+            ToolbarItem(placement: .navigation) {
+                HStack(spacing: 12) {
+                    SymbolBadge(symbol: "doc.text", size: 38)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(outcome.map { String($0.text.prefix(45)) } ?? "Engineering")
+                            .font(.system(size: 18, weight: .semibold))
+                        Text("Engineering").font(.system(size: 14)).foregroundStyle(.secondary)
+                    }
+                }.padding(.leading, 92)
+            }.sharedBackgroundVisibility(.hidden)
+            #endif
             ToolbarItem(placement: .primaryAction) {
-                Button("New outcome", systemImage: "square.and.pencil") { sheet = .newOutcome }
-                    .keyboardShortcut("n", modifiers: .command)
-                    .help("Start a new outcome")
-            }
-            ToolbarItem(placement: .primaryAction) {
-                if store.isPlanning {
-                    Button("Cancel Planning", systemImage: "stop.fill") { store.cancelPlanning() }
-                        .tint(.orange)
-                } else {
-                    Button("Pause Team", systemImage: "pause.fill") { }
-                        .tint(.orange).disabled(true)
-                        .help("Developer execution is not connected yet")
+                GlassEffectContainer(spacing: 12) {
+                    HStack(spacing: 12) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                            TextField("Search", text: $search).textFieldStyle(.plain)
+                                .accessibilityLabel("Search outcomes")
+                        }
+                        .font(.system(size: 15)).padding(.horizontal, 14).frame(width: 164, height: 38)
+                        .glassEffect(.regular, in: .capsule)
+                        Button { sheet = .newOutcome } label: {
+                            Image(systemName: "square.and.pencil").font(.system(size: 18)).frame(width: 24, height: 28)
+                        }
+                        .buttonStyle(.glass).buttonBorderShape(.circle)
+                        .keyboardShortcut("n", modifiers: .command)
+                        .accessibilityLabel("New outcome").help("Start a new outcome")
+                        Button {
+                            store.cancelPlanning()
+                        } label: {
+                            Label(store.isPlanning ? "Cancel Planning" : "Pause Team",
+                                  systemImage: store.isPlanning ? "stop.fill" : "pause.fill")
+                                .font(.system(size: 15, weight: .medium)).padding(.horizontal, 6).frame(height: 28)
+                        }
+                        .buttonStyle(.glass).tint(.orange).disabled(!store.isPlanning)
+                        .help(store.isPlanning ? "Cancel planning" : "Developer execution is not connected yet")
+                        Menu {
+                            Button("Developers", systemImage: "person.2") { sheet = .team }
+                            Button("Settings", systemImage: "gearshape") { sheet = .settings }
+                                .keyboardShortcut(",", modifiers: .command)
+                        } label: {
+                            Image(systemName: "ellipsis").font(.system(size: 18)).frame(width: 24, height: 28)
+                        }
+                        .menuIndicator(.hidden).buttonStyle(.glass).buttonBorderShape(.circle)
+                        .accessibilityLabel("More options")
+                    }
                 }
-            }
-            ToolbarItem(placement: .primaryAction) {
-                Menu("More", systemImage: "ellipsis") {
-                    Button("Developers", systemImage: "person.3") { sheet = .team }
-                    Button("Settings", systemImage: "gearshape") { sheet = .settings }
-                        .keyboardShortcut(",", modifiers: .command)
-                }
-            }
+            }.sharedBackgroundVisibility(.hidden)
         }
         #if os(macOS)
         .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
@@ -128,38 +126,116 @@ struct StudioRootView: View {
         message: { Text(store.failure ?? "") }
     }
 
-    private var sidebar: some View {
-        List(selection: $destination) {
-            Section("Engineering") {
-                Label("All outcomes", systemImage: "rectangle.stack").tag(WorkspaceDestination.all)
-                HStack {
-                    Label("Needs input", systemImage: "bubble.left")
-                    Spacer()
-                    Text(pendingIDs.count, format: .number).foregroundStyle(.secondary)
-                }.tag(WorkspaceDestination.needsInput)
-            }
-            Section("Outcomes") {
-                ForEach(store.workspace.outcomes.reversed()) { item in
-                    Label(item.text, systemImage: "doc.text")
-                        .lineLimit(2).tag(WorkspaceDestination.outcome(item.id))
-                }
-            }
-            Section("Team") {
-                Button { sheet = .team } label: {
-                    HStack {
-                        Label("Developers", systemImage: "person.3")
-                        Spacer()
-                        Text(Specialty.allCases.count, format: .number).foregroundStyle(.secondary)
-                    }
-                }.buttonStyle(.plain)
-                Label("0 connected", systemImage: "network.slash")
-                    .font(.caption).foregroundStyle(.secondary)
+    @ViewBuilder private var workspaceColumns: some View {
+        #if os(macOS)
+        HSplitView {
+            sidebar
+                .frame(minWidth: 230, idealWidth: 258, maxWidth: 300)
+            conversationColumn
+                .frame(minWidth: 430, idealWidth: 610, maxWidth: .infinity)
+                .padding(.horizontal, 10)
+            detailColumn
+                .frame(minWidth: 320, idealWidth: 368, maxWidth: 420)
+        }
+        .padding(.horizontal, 16).padding(.top, 10).padding(.bottom, 20)
+        #else
+        NavigationSplitView(columnVisibility: $columns, preferredCompactColumn: $compactColumn) {
+            sidebar.navigationSplitViewColumnWidth(min: 230, ideal: 258, max: 300)
+        } content: {
+            conversationColumn
+                .navigationTitle(outcome.map { String($0.text.prefix(55)) } ?? "Engineering")
+                .navigationSplitViewColumnWidth(min: 340, ideal: 610)
+        } detail: {
+            detailColumn.navigationSplitViewColumnWidth(min: 300, ideal: 368, max: 420)
+        }
+        .navigationSplitViewStyle(.balanced)
+        #endif
+    }
+
+    private var conversationColumn: some View {
+        Group {
+            if let outcome {
+                EngineeringRoomView(store: store, outcome: outcome, selectedTaskID: $selectedTaskID, initialDraft: initialDraft)
+                    .id(outcome.id)
+            } else { outcomeList }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var detailColumn: some View {
+        Group {
+            if let selectedTask { TaskDetailView(task: selectedTask) }
+            else {
+                ContentUnavailableView("Select a task", systemImage: "sidebar.right",
+                                       description: Text("Its scope, requirements and handoff appear here."))
             }
         }
-        .listStyle(.sidebar)
-        .scrollContentBackground(.hidden)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .modifier(WorkspacePanel())
+    }
+
+    private var sidebar: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 5) {
+                sidebarHeading("Engineering")
+                destinationRow("All outcomes", symbol: "rectangle.stack", value: .all)
+                destinationRow("Needs input", symbol: "bubble.left", value: .needsInput, count: pendingIDs.isEmpty ? nil : pendingIDs.count)
+                Divider().padding(.horizontal, 12).padding(.vertical, 13)
+                sidebarHeading("Outcomes")
+                ForEach(store.workspace.outcomes.reversed()) { item in
+                    destinationRow(item.text, symbol: "doc.text", value: .outcome(item.id))
+                }
+                Divider().padding(.horizontal, 12).padding(.vertical, 13)
+                sidebarHeading("Team")
+                Button { sheet = .team } label: {
+                    HStack(spacing: 14) {
+                        Image(systemName: "person.2").font(.system(size: 22)).frame(width: 26)
+                        VStack(alignment: .leading, spacing: 7) {
+                            Text("Developers")
+                            Label("0 connected", systemImage: "circle").font(.system(size: 13)).foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 0)
+                        Text(Specialty.allCases.count, format: .number).foregroundStyle(.secondary)
+                        Image(systemName: "chevron.right").font(.system(size: 11)).foregroundStyle(.secondary)
+                    }.padding(.horizontal, 14).padding(.vertical, 12).contentShape(.rect)
+                }.buttonStyle(.plain)
+            }.padding(.horizontal, 8).padding(.top, 16)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .modifier(WorkspacePanel())
         .navigationTitle("Engineering")
-        .searchable(text: $search, prompt: "Search outcomes")
+    }
+
+    private func sidebarHeading(_ text: String) -> some View {
+        Text(text).font(.system(size: 16, weight: .medium)).foregroundStyle(.secondary)
+            .padding(.horizontal, 12).padding(.vertical, 6)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    private func destinationRow(_ title: String, symbol: String, value: WorkspaceDestination, count: Int? = nil) -> some View {
+        Button {
+            destination = value
+            compactColumn = .content
+        } label: {
+            HStack(spacing: 14) {
+                Image(systemName: symbol).font(.system(size: 21)).frame(width: 26)
+                Text(title).font(.system(size: 16)).lineLimit(2)
+                Spacer(minLength: 0)
+                if let count {
+                    Text(count, format: .number).font(.system(size: 14))
+                        .padding(.horizontal, 10).padding(.vertical, 4).background(.thinMaterial, in: .capsule)
+                }
+            }
+            .padding(.horizontal, 14).frame(minHeight: 43).contentShape(.rect)
+            .background {
+                if destination == value {
+                    RoundedRectangle(cornerRadius: 11).fill(.blue.gradient)
+                        .overlay { RoundedRectangle(cornerRadius: 11).strokeBorder(.white.opacity(0.24)) }
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(destination == value ? [.isSelected] : [])
     }
 
     private var outcomeList: some View {
@@ -257,20 +333,6 @@ private struct NewOutcomeView: View {
 enum StudioStyle {
     static let accent = Color.blue
     static let paper = Color.clear
-}
-
-struct StudioBackdrop: View {
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    var body: some View {
-        Rectangle().fill(.background)
-            .overlay {
-                if !reduceTransparency {
-                    LinearGradient(colors: [.blue.opacity(0.19), .clear, .blue.opacity(0.13)],
-                                   startPoint: .topLeading, endPoint: .bottomTrailing)
-                }
-            }
-            .ignoresSafeArea()
-    }
 }
 
 struct SectionEyebrow: View {

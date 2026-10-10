@@ -23,7 +23,7 @@ private final class CaptureDelegate: NSObject, NSApplicationDelegate {
                 try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
                 var workspace = Workspace()
                 let outcomeID = try workspace.recordOutcome("Build coordinator")
-                let plan = WorkPlan(summary: "Four independent scopes are ready for assignment. This is preview data; no work has been dispatched.", tasks: [
+                let plan = WorkPlan(summary: "Intake and ownership can proceed together.", tasks: [
                     WorkTask(id: "ui-01", title: "Outcome intake", owner: .interface,
                              paths: ["Apps/EngineeringStudio/Features/EngineeringRoomView.swift"],
                              acceptance: ["Save messages with the selected outcome."],
@@ -42,16 +42,21 @@ private final class CaptureDelegate: NSObject, NSApplicationDelegate {
                              dependencies: [], handoff: "Share Mac and iPhone navigation captures with Testing.")
                 ])
                 try workspace.attach(plan, to: outcomeID)
-                try workspace.recordMessage("Prioritize handoff validation next.", for: outcomeID)
+                _ = try workspace.recordOutcome("Model access")
+                _ = try workspace.recordOutcome("Native navigation")
+                workspace.messages = [
+                    RoomMessage(author: .user, text: "Start with outcome intake and task ownership.", outcomeID: outcomeID),
+                    RoomMessage(author: .coordinator, text: plan.summary, outcomeID: outcomeID)
+                ]
                 let store = StudioStore(preview: workspace)
                 try await capture(StudioRootView(store: store, initialOutcomeID: outcomeID, initialTaskID: "core-01", initialDraft: "Prioritize handoff validation next."),
-                                  name: "01-workspace", width: 1440, height: 960, output: output)
+                                  name: "01-workspace", width: 1280, height: 858, output: output)
                 try await capture(StudioRootView(store: store, initialOutcomeID: outcomeID, initialTaskID: "core-01"),
-                                  name: "02-compact-workspace", width: 1080, height: 760, output: output)
+                                  name: "02-compact-workspace", width: 1100, height: 758, output: output)
                 try await capture(StudioRootView(store: StudioStore(preview: Workspace())),
                                   name: "03-empty-workspace", width: 1280, height: 820, output: output)
                 try await capture(StudioRootView(store: store, initialOutcomeID: outcomeID, initialTaskID: "core-01"),
-                                  name: "04-increased-contrast", width: 1440, height: 960, output: output, highContrast: true)
+                                  name: "04-increased-contrast", width: 1280, height: 858, output: output, highContrast: true)
                 print("Captured real native SwiftUI views with preview data. Services disabled.")
                 NSApp.terminate(nil)
             } catch {
@@ -72,6 +77,7 @@ private final class CaptureDelegate: NSObject, NSApplicationDelegate {
         window.isReleasedWhenClosed = false
         window.title = "Engineering Studio — Preview data · Services disabled"
         window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
         window.toolbarStyle = .unified
         window.appearance = NSAppearance(named: highContrast ? .accessibilityHighContrastDarkAqua : .darkAqua)
         window.contentView = host
@@ -85,6 +91,7 @@ private final class CaptureDelegate: NSObject, NSApplicationDelegate {
         print("Window active: \(NSApp.isActive), key: \(window.isKeyWindow), reduced transparency: \(NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency)")
         host.layoutSubtreeIfNeeded()
         host.displayIfNeeded()
+        window.makeFirstResponder(nil)
         let destination = output.appendingPathComponent(name + ".png")
         // Launch Services gives this app a real foreground window. The CI shell
         // performs screen capture using its existing screen-recording access.
