@@ -12,7 +12,7 @@ The app starts with an empty, local workspace. Use New Outcome to begin. Outcome
 
 ## Workspace design
 
-The accepted design uses three native `NavigationSplitView` columns: outcomes, the selected outcome's conversation/tasks, and the selected task's details. Columns resize on Mac and adapt to compact navigation on iPhone. Task details occupy the third column rather than a modal overlay. New Outcome, Developers and Settings use system sheets.
+The accepted design uses three native panes: outcomes, the selected outcome's conversation/tasks, and the selected task's details. Mac uses `HSplitView` to keep the resizable sidebar and task panel inset below the unified toolbar. iPhone uses `NavigationSplitView` for compact navigation. Task details occupy the third pane rather than a modal overlay. New Outcome, Developers and Settings use system sheets.
 
 The dark window uses a continuous background, semantic standard materials for content, the native unified toolbar, and Liquid Glass for the composer and actions. Blue identifies Send, green identifies planning/run actions, and amber identifies cancellation/pause intent. Symbols and labels carry meaning alongside color. Execution and verification actions remain disabled with explanations until their services exist; a planned task never claims to be running or tested.
 

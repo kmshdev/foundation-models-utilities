@@ -1,55 +1,57 @@
-# Native workspace design QA — 2026-10-10
+# Native workspace visual QA — reference correction
 
-**Final result: blocked**
+**final result: blocked**
 
-The selected direction is implemented in SwiftUI and captured in a real foreground Mac window. Full product acceptance remains blocked by the unavailable Swift 6.4 / iOS 27 / macOS 27 Xcode toolchain and unverified native interaction/accessibility behavior. This report does not certify a deployable app or pixel-identical rendering of the concept.
+The reference correction is implemented and captured. The earlier pass was materially different from the approved concept; those differences were not merely an inactive-window issue. The revised composition is substantially closer, but final product acceptance still needs the complete SDK 27 app and device interaction/material checks described below.
 
-## Comparison evidence
+## Source and evidence
 
-- Source visual truth: `Documentation/Design/approved-workspace-concept.png`, 1487 × 1058 pixels, generated concept supplied as the approved direction.
-- Implementation: `Documentation/Previews/01-workspace.png`, 1440 × 1012 pixels, including native window chrome; requested content frame 1440 × 960 points, captured at 1×.
-- Source and implementation were opened together in the same comparison input, then inspected with the narrower and empty native captures. Both are dark, three-column windows with the same selected task. The source is about 3% wider; no claims of exact pixel matching are made. CSS viewport and browser density do not apply to this SwiftUI application.
-- Focused inspection used the original full-resolution images to check the toolbar, selected task, detail text wrapping and composer. No image editing or generated replacement pixels were used for the native captures.
-- Runtime: macOS 26.6.2, foreground/key window, Reduce Transparency off. `04-increased-contrast.png` explicitly uses `accessibilityHighContrastDarkAqua`; this is appearance evidence, not a full accessibility test.
-- [Capture run](https://github.com/kmshdev/foundation-models-utilities/actions/runs/38060655235), source commit `77aa1d0`.
+- Source: `Documentation/Design/approved-workspace-concept.png` (1487 × 1058 generated concept); the user's displayed reference is approximately 1280 × 910.
+- Implementation: `Documentation/Previews/01-workspace.png` (1280 × 910 native pixels, 1280 × 858 content points plus native toolbar, 1× capture).
+- Additional captures: `02-compact-workspace.png` (1100 × 810), `03-empty-workspace.png` (1280 × 872), `04-increased-contrast.png` (1280 × 910).
+- Source and revised implementation were opened together in the same comparison input. The concept's proportions were compared at approximately 0.861× display scale, not mistaken for a larger logical viewport. Both full windows include chrome. CSS sizing and browser checks do not apply to this SwiftUI app.
+- Focused inspection at native resolution covered toolbar grouping, sidebar selection, SF Symbol badges, table columns, path wrapping, task actions and composer edges. Images were not edited to simulate interface rendering.
+- [Native build, iOS shared-view typecheck and capture run](https://github.com/kmshdev/foundation-models-utilities/actions/runs/38071723190), source `e62ed0e`, macOS 26.6.2. Capture logs confirm active/key windows and Reduce Transparency off. Normal captures explicitly use regular legibility weight; the accessibility capture uses increased-contrast appearance plus bold legibility. Production inherits system preferences.
 
-The reference depicts active developers, passed tests and a PR. The implementation depicts an undispatched plan with disconnected services. Those intentional state differences prevent meaningful visual comparisons of running/completed colors or enabled execution actions.
+## Findings and corrections
 
-## Findings and required validation
-
-- **P1 — Production toolchain unavailable.** The required native build cannot run on the current runner. Install/select Xcode with Swift 6.4 and both SDK 27 platforms, then build the actual application targets including FoundationPlanner. The isolated preview and shared-view typecheck do not replace this check.
-- **P2 — Native interactions remain unverified.** Screenshots confirm layout, not keyboard navigation, VoiceOver reading order, sheet focus restoration, live column resizing or iPhone navigation collapse. Exercise those behaviors on the production app before accepting the design as finished. The capture harness does not claim to have clicked Send, changed tabs, opened sheets or run a task.
-- **Material fidelity remains provisional.** The real standard materials and glass controls are darker and less luminous than the concept. A CI desktop's background and system settings affect this appearance. Keep semantic materials; compare on the target Mac with real wallpaper, active/inactive windows, Reduce Transparency and Increase Contrast before tuning. Do not reproduce the illustration's glow using painted glass textures.
+| Prior finding | Correction | Post-fix evidence |
+| --- | --- | --- |
+| P1: sidebar and task panel proportions materially differed; full-height sidebar enclosed the toolbar | Native Mac `HSplitView`, inset panels, preferred 258-point sidebar and 368-point details, shared bottom baseline | Panels run from about y=62 to y=872 in `01-workspace.png`; composer ends on the same baseline |
+| P1: small controls and missing Owner column changed information hierarchy | 16-point conversation/sidebar text, 14-point metadata, larger primary controls, distinct Task / Owner / Status cells | Full and narrow captures keep task ownership visible |
+| P1: large black surfaces did not follow the layered slate reference | Shared blue/slate backdrop, semantic thin material panels, subtle content highlights, native Liquid Glass control surfaces | Sidebar, content, detail and toolbar remain visually continuous in the native capture |
+| P2: toolbar items clustered alongside title; Pause collapsed to an icon | Native flexible toolbar spacer, explicit label style and separate SF Symbol glass controls | Search and actions occupy the trailing edge; Pause Team retains its label |
+| P2: tiny badges and composer lacked the reference's visual weight | 48-point conversation badges, 62-point detail badge, rounded text field and 118 × 50 Send surface | SF Symbols and input controls are legible at reference scale |
+| P2: long handoff text pushed verification below the reference's hierarchy | Brief visible route with full context in a native disclosure | Verification and task actions remain visible; instructions are not discarded |
 
 ## Required fidelity surfaces
 
-- **Typography:** native system fonts and SF Symbols replace the concept's generated approximations. Native text is smaller and denser; task titles, owners and status remain distinct. File paths wrap at the narrow detail width. Native toolbar title sizing is retained. Larger text and VoiceOver need device validation.
-- **Spacing/layout:** the three-column structure, persistent composer and full-height task detail follow the source. The native sidebar is narrower and task ownership appears beneath each title rather than in a fixed table column, accommodating compact widths. At 1080 pixels the conversation scrolls and the composer remains visible; no persistent action is clipped. No separate toolbar slab or task-detail modal was introduced.
-- **Colors/tokens:** dark semantic backgrounds with subtle blue ambient color; standard material for the detail surface, glass for the composer/actions. Blue Send is visible in the foreground capture. Green Run and amber Pause are intentionally unavailable until execution exists. Color is accompanied by symbols and text. System sidebar selection depends on focus and is not forced to remain bright blue when focus moves to the composer.
-- **Assets:** SF Symbols are native vector icons. The unavailable GitHub task/PR integration is represented by a specialty symbol, avoiding a misleading connected-service badge. A generic person symbol replaces the concept's fictitious user portrait. No web screenshot is embedded in the app.
-- **Copy/content:** outcome conversations are scoped and persisted. The app says Planned, 0 connected and Tests have not run. Preview-only data is explicitly marked. The production app starts empty. False completed/running/test/PR evidence from the illustration was not copied.
+- **Typography:** native system fonts with explicit sizes and weights; regular and bold-legibility states captured separately. Native 1× text rasterization remains visually different from the generated reference. No custom font approximations were installed.
+- **Spacing/layout:** three resizable panes, inset sidebar/detail, floating toolbar groups, rounded segment control and persistent composer restored. At 1100 pixels task titles wrap into two lines; all owners and statuses remain visible, and the conversation scrolls above the composer.
+- **Colors/materials:** blue selection/Send and amber pause intent; standard materials beneath real `glassEffect` surfaces. The native rendering is flatter and less luminous than the illustration. Exact reflective appearance still needs comparison on the target Mac; this is not declared a pixel-identical glass reproduction.
+- **Icons/assets:** all workspace icons use SF Symbols through `Image(systemName:)` or `Label(systemImage:)`. The concept's GitHub logo and fictitious face are intentionally replaced with task/person symbols. No raster UI or handwritten imitation of those symbols is used.
+- **Copy/state:** the fixture uses equivalent outcome/task names but truthful planned/offline states. Proposed handoff context is structured plan content, not a fabricated developer response. Test success, accepted handoffs, running bots and real PRs from the concept are not copied. Production starts empty.
 
 ## Comparison history
 
-1. Early captures showed opaque surfaces and inactive controls. Diagnosis found the CI runner's Reduce Transparency setting and nonforeground launch state. Those captures were not accepted as standard glass evidence.
-2. Capture preferences were corrected and the preview was launched through Launch Services. macOS then required the CI shell, which already had recording access, to perform the screenshot. These were capture-environment fixes, not visual design acceptance passes.
-3. Run `38060655235` produced four foreground captures. Comparison now verifies three columns, native floating toolbar groups, persistent composer, truthful task detail, empty state and narrower window composition. Full production interaction and target-SDK acceptance remain blocked as above.
+1. User rejected the prior `77aa1d0` capture. Recorded the proportions, table, typography, controls and material treatment as substantive fidelity failures.
+2. `a820bc0` native capture restored structure and larger symbols but revealed over-wide side panes and toolbar clustering. Corrected both; this was a visual-QA iteration, not just compile troubleshooting.
+3. `e89aed7` capture corrected pane widths, panel baseline and material hierarchy. Further refined accent hue, exact glass control shapes, title alignment and handoff density.
+4. `e62ed0e` recapture checked the source and implementation together, plus narrow, empty and increased-contrast states. Remaining material/runtime acceptance limits are explicit below.
 
-## Verification
+## Remaining blockers and validation
 
-- Twelve EngineeringCore tests passed with Swift 6.4, including outcome-thread isolation and legacy-message decoding.
-- Actual SwiftUI views and store compiled and ran in the Mac preview host.
-- Shared views and the app entry point passed installed-iOS-simulator-SDK typechecking with the disabled preview model service.
-- The production SDK 27 job failed explicitly because its required toolchain was absent.
-- No browser was used: this is a native SwiftUI app, not a web prototype. Browser console checks are inapplicable. Native capture logs show foreground/key windows and four successful captures; they do not establish absence of all application runtime errors.
+- Full Swift 6.4 / iOS 27 / macOS 27 build remains blocked because the current runner lacks the required Xcode toolchain. The isolated SDK 26 preview compiles the real views/store with a disabled model service.
+- Native keyboard focus, sheets, live divider dragging, VoiceOver and compact iPhone interactions were not executed by this capture harness. Screenshots do not prove those behaviors.
+- Final reflective-material fidelity requires target-device comparison; the source illustration and this CI desktop do not have identical rendering/background conditions.
+- Twelve Swift 6.4 core tests passed in [validation run](https://github.com/kmshdev/foundation-models-utilities/actions/runs/38071723160). Mac view compilation and shared iOS view typechecking passed. Capture logs reported no compiler diagnostics for the final preview build; no claim of exhaustive runtime-error coverage is made.
+- Test execution, PR navigation, attachments and team pause remain unavailable until their backing features exist. Disabled actions are not represented as functional.
 
-## Implementation checklist
+## Checklist
 
-- [x] Save the approved direction and design rules.
-- [x] Implement native three-column navigation, selected task detail and floating composer.
-- [x] Scope follow-up messages to their outcome and preserve legacy history.
-- [x] Capture actual populated, narrow, empty and increased-contrast views.
-- [x] Run core tests and shared-view typechecking.
-- [ ] Build both complete SDK 27 app targets.
-- [ ] Validate native interactions, sheets, accessibility and compact-device navigation.
-- [ ] Compare material appearance on the target Mac before final visual acceptance.
+- [x] Research Apple materials, glass, split containers and SF Symbols documentation.
+- [x] Correct reference-scale composition and capture the actual native views.
+- [x] Inspect populated, narrow, empty and accessibility appearances.
+- [x] Preserve honest data and disabled service states.
+- [ ] Build complete targets with the required SDK 27 toolchain.
+- [ ] Verify native interactions and material appearance on target devices.
