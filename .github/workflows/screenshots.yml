@@ -20,7 +20,19 @@ jobs:
         run: |
           defaults write com.apple.universalaccess reduceTransparency -bool false
           defaults write com.apple.universalaccess increaseContrast -bool false
-          open -W -n --stdout "$RUNNER_TEMP/preview.log" --stderr "$RUNNER_TEMP/preview-errors.log" .preview-build/SwiftUIPreview.app --args "$RUNNER_TEMP/native-previews"
+          open -W -n --stdout "$RUNNER_TEMP/preview.log" --stderr "$RUNNER_TEMP/preview-errors.log" .preview-build/SwiftUIPreview.app --args "$RUNNER_TEMP/native-previews" --external-capture &
+          preview_launcher=$!
+          for preview in 01-workspace 02-compact-workspace 03-empty-workspace 04-increased-contrast; do
+            request="$RUNNER_TEMP/native-previews/$preview.window-id"
+            for attempt in {1..150}; do
+              test -f "$request" && break
+              sleep 0.2
+            done
+            test -f "$request"
+            /usr/sbin/screencapture -x -o -l "$(cat "$request")" "$RUNNER_TEMP/native-previews/$preview.partial.png"
+            mv "$RUNNER_TEMP/native-previews/$preview.partial.png" "$RUNNER_TEMP/native-previews/$preview.png"
+          done
+          wait "$preview_launcher"
           cat "$RUNNER_TEMP/preview.log" "$RUNNER_TEMP/preview-errors.log"
       - uses: actions/upload-artifact@v4
         with:

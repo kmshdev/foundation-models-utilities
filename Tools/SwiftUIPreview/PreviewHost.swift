@@ -86,13 +86,23 @@ private final class CaptureDelegate: NSObject, NSApplicationDelegate {
         host.layoutSubtreeIfNeeded()
         host.displayIfNeeded()
         let destination = output.appendingPathComponent(name + ".png")
-        let capture = Process()
-        capture.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
-        capture.arguments = ["-x", "-o", "-l", String(window.windowNumber), destination.path]
-        try capture.run()
-        capture.waitUntilExit()
-        guard capture.terminationStatus == 0,
-              let bitmap = NSBitmapImageRep(data: try Data(contentsOf: destination)) else {
+        // Launch Services gives this app a real foreground window. The CI shell
+        // performs screen capture using its existing screen-recording access.
+        if CommandLine.arguments.contains("--external-capture") {
+            try String(window.windowNumber).write(to: output.appendingPathComponent(name + ".window-id"), atomically: true, encoding: .utf8)
+            for _ in 0..<150 {
+                if FileManager.default.fileExists(atPath: destination.path) { break }
+                try await Task.sleep(for: .milliseconds(200))
+            }
+        } else {
+            let capture = Process()
+            capture.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+            capture.arguments = ["-x", "-o", "-l", String(window.windowNumber), destination.path]
+            try capture.run()
+            capture.waitUntilExit()
+            guard capture.terminationStatus == 0 else { throw CocoaError(.fileWriteUnknown) }
+        }
+        guard let bitmap = NSBitmapImageRep(data: try Data(contentsOf: destination)) else {
             throw CocoaError(.fileWriteUnknown)
         }
         print("Captured \(name): \(bitmap.pixelsWide) × \(bitmap.pixelsHigh)")
