@@ -20,7 +20,8 @@ jobs:
         run: |
           defaults write com.apple.universalaccess reduceTransparency -bool false
           defaults write com.apple.universalaccess increaseContrast -bool false
-          .preview-build/SwiftUIPreview.app/Contents/MacOS/SwiftUIPreview "$RUNNER_TEMP/native-previews"
+          open -W -n --stdout "$RUNNER_TEMP/preview.log" --stderr "$RUNNER_TEMP/preview-errors.log" .preview-build/SwiftUIPreview.app --args "$RUNNER_TEMP/native-previews"
+          cat "$RUNNER_TEMP/preview.log" "$RUNNER_TEMP/preview-errors.log"
       - uses: actions/upload-artifact@v4
         with:
           name: native-swiftui-previews
