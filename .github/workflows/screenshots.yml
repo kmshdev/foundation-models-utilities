@@ -17,7 +17,10 @@ jobs:
       - name: Build isolated SwiftUI preview host
         run: swift Tools/SwiftUIPreview/BuildPreview.swift
       - name: Capture actual SwiftUI view rendering
-        run: .preview-build/SwiftUIPreview.app/Contents/MacOS/SwiftUIPreview "$RUNNER_TEMP/native-previews"
+        run: |
+          defaults write com.apple.universalaccess reduceTransparency -bool false
+          defaults write com.apple.universalaccess increaseContrast -bool false
+          .preview-build/SwiftUIPreview.app/Contents/MacOS/SwiftUIPreview "$RUNNER_TEMP/native-previews"
       - uses: actions/upload-artifact@v4
         with:
           name: native-swiftui-previews

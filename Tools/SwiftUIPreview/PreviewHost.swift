@@ -79,7 +79,7 @@ private final class CaptureDelegate: NSObject, NSApplicationDelegate {
         window.makeKeyAndOrderFront(nil)
         NSApp.activate()
         try await Task.sleep(for: .seconds(2))
-        NSRunningApplication.current.activate(options: [.activateAllWindows, .activateIgnoringOtherApps])
+        NSRunningApplication.current.activate(options: [.activateAllWindows])
         window.makeKeyAndOrderFront(nil)
         try await Task.sleep(for: .seconds(1))
         print("Window active: \(NSApp.isActive), key: \(window.isKeyWindow), reduced transparency: \(NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency)")
