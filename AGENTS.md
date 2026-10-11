@@ -10,6 +10,18 @@ The `swift-app` branch contains the native engineering app and the FoundationMod
 - Never claim developers are available without actual presence, that a plan was dispatched without delivery, or that a test/PR exists without evidence. Personal ChatGPT subscription access must use a documented, supported integration; an API key is not a subscription and authentication must not be coupled to a Mac runner.
 - Validate portable logic with `swift test --package-path Packages/EngineeringCore`. Validate application targets with Xcode and the required Apple SDKs. Linux core tests and syntax checks do not establish a runnable native app.
 
+## Project structure
+
+- Use a consistent project structure, with folder layout determined by app features.
+- Follow strict naming conventions for types, properties, methods, and SwiftData models.
+- Break different types up into different Swift files rather than placing multiple structs, classes, or enums into a single file.
+- Write unit tests for core application logic.
+- Only write UI tests if unit tests are not possible.
+- Add code comments and documentation comments as needed.
+- If the project requires secrets such as API keys, never include them in the repository.
+- If the project uses Localizable.xcstrings, prefer to add user-facing strings using symbol keys (e.g. helloWorld) in the string catalog with `extractionState` set to "manual", accessing them via generated symbols such as  `Text(.helloWorld)`. Offer to translate new keys into all languages supported by the project.
+
+
 ## Development team
 
 - Follow `strategy/README.md` and choose the smallest relevant team from `.codex/agents`. The 24 development profiles are separate from the app's eight specialist bots. Check actual runtime capacity before spawning; eight is a ceiling, not a target. Model and reasoning settings inherit the parent.
