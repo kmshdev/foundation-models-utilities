@@ -45,7 +45,7 @@ Tests/                        FoundationModelsUtilities tests
 .github/workflows/            Core tests and Apple-platform build checks
 ```
 
-The app lives on the `swift-app` branch of [`kmshdev/foundation-models-utilities`](https://github.com/kmshdev/foundation-models-utilities/tree/swift-app). Both app targets consume FoundationModelsUtilities directly from the root Swift package and EngineeringCore from `Packages/EngineeringCore`. No self-referencing remote package checkout is needed. Run the commands below from the repository root. The earlier TypeScript coordinator PR remains closed and is not part of this branch.
+The app lives on the default `main` branch of [`kmshdev/foundation-models-utilities`](https://github.com/kmshdev/foundation-models-utilities/tree/main). Both app targets consume FoundationModelsUtilities directly from the root Swift package and EngineeringCore from `Packages/EngineeringCore`. No self-referencing remote package checkout is needed. Run the commands below from the repository root. The earlier TypeScript coordinator PR remains closed and is not part of this branch.
 
 Implementation code in this project is Swift. Use Apple frameworks, Swift packages and documented Apple APIs. Do not introduce TypeScript, JavaScript, Python, Node-based services or a web UI into this project. Cloud preferences do not override the Swift requirement.
 

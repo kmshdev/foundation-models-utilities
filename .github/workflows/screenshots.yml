@@ -1,7 +1,7 @@
 name: Capture native SwiftUI previews
 on:
   push:
-    branches: [swift-app]
+    branches: [main]
     paths:
       - 'Apps/EngineeringStudio/**'
       - 'Packages/EngineeringCore/Sources/**'

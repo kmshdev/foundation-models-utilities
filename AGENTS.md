@@ -1,6 +1,6 @@
 # Engineering Studio
 
-The `swift-app` branch contains the native engineering app and the FoundationModelsUtilities library in one repository.
+The default `main` branch contains the native engineering app and the FoundationModelsUtilities library in one repository.
 
 - All application, coordinator, model integration and developer execution implementation code must be Swift. Use Swift 6.4, SwiftUI, iOS 27 and macOS 27. Do not introduce TypeScript, JavaScript, Python, a Node runtime or a web app. Project metadata, asset catalogs and CI configuration are not alternate implementation stacks.
 - Research current Apple documentation, tutorials, sample projects and relevant Swift repositories before choosing APIs or adding dependencies. Verify API availability and distinguish documented capabilities from assumptions.

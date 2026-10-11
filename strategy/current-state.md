@@ -20,9 +20,9 @@ Recorded 2026-10-11. This is a checkpoint, not a production-readiness claim.
 
 These items are future implementation work; installing development roles, skills and strategy does not itself complete them. Use the runbook matching the next user outcome, not the entire backlog at once.
 
-## Repository setting limitation
+## Repository branch
 
-The app work is saved on `swift-app`. GitHub still reports `main` as the default branch. Applying the user's earlier request to set `swift-app` as default again on 2026-10-11 returned HTTP 403, `Resource not accessible by integration`. Repository metadata reports the user's admin permission, but the CLI integration cannot perform this settings mutation. Code pushes remain available. No default-branch change is claimed.
+Resolved 2026-10-12: the user renamed the app branch from `swift-app` to `main` and made it the default. The local checkout now tracks `origin/main`, preserves the prior utilities-only local branch as `archived-utilities-main`, and includes the user's SDK 27 skills and harness commits. Native validation and capture workflows now watch `main`. No administration credential is needed to continue this app work.
 
 ## Service integration checkpoint
 

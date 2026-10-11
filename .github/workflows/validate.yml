@@ -2,7 +2,7 @@ name: Validate Swift app
 
 on:
   push:
-    branches: [swift-app]
+    branches: [main]
   pull_request:
   workflow_dispatch:
     inputs:
