@@ -34,6 +34,38 @@ private func task(_ id: String, path: String, dependencies: [String] = []) -> Wo
     #expect(restored.text == message.text)
 }
 
+@Test func legacyWorkspacesLoadWithoutDrafts() throws {
+    var workspace = Workspace()
+    _ = try workspace.recordOutcome("Existing outcome")
+    let data = try JSONEncoder().encode(workspace)
+    var fields = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    fields.removeValue(forKey: "drafts")
+    let restored = try JSONDecoder().decode(Workspace.self, from: JSONSerialization.data(withJSONObject: fields))
+    #expect(restored == workspace)
+    #expect(restored.drafts.isEmpty)
+}
+
+@Test func draftAndMessageCommitTogether() async throws {
+    let directory = URL.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let repository = WorkspaceRepository(url: directory.appendingPathComponent("workspace.json"))
+    var workspace = Workspace()
+    let outcome = try workspace.recordOutcome("Build the room")
+    workspace.drafts[outcome] = "Keep this exact text\nincluding whitespace "
+    try await repository.save(workspace)
+    let restored = try await repository.load()
+    #expect(restored.drafts == workspace.drafts)
+    try workspace.recordMessage(try #require(workspace.drafts[outcome]), for: outcome)
+    workspace.drafts[outcome] = nil
+    try await repository.save(workspace)
+    try await repository.save(workspace) // Retrying the same commit is idempotent.
+    let sent = try await repository.load()
+    #expect(sent.drafts.isEmpty)
+    #expect(sent.messages.count == 2)
+    await #expect(throws: WorkspaceError.staleRevision) { try await repository.save(restored) }
+    #expect(try await repository.load() == sent)
+}
+
 @Test func rejectsOverlappingApplePaths() {
     for paths in [("Sources/Room.swift", "sources/room.swift"), ("Apps", "Apps/Room.swift"),
                   ("Sources/Caf\u{00e9}.swift", "Sources/Cafe\u{0301}.swift")] {

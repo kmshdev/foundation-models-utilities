@@ -94,7 +94,24 @@ public struct Workspace: Codable, Sendable, Equatable {
     public var outcomes: [Outcome] = []
     public var messages: [RoomMessage] = []
     public var questions: [QuestionBatch] = []
+    /// Persisted with messages so sending and clearing a composer are atomic.
+    public var drafts: [UUID: String] = [:]
     public init() {}
+
+    private enum CodingKeys: String, CodingKey {
+        case version, revision, outcomes, messages, questions, drafts
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        version = try values.decode(Int.self, forKey: .version)
+        revision = try values.decode(Int.self, forKey: .revision)
+        outcomes = try values.decode([Outcome].self, forKey: .outcomes)
+        messages = try values.decode([RoomMessage].self, forKey: .messages)
+        questions = try values.decode([QuestionBatch].self, forKey: .questions)
+        // Workspaces written before draft persistence remain readable.
+        drafts = try values.decodeIfPresent([UUID: String].self, forKey: .drafts) ?? [:]
+    }
 
     @discardableResult public mutating func recordOutcome(_ input: String) throws -> UUID {
         let text = input.trimmingCharacters(in: .whitespacesAndNewlines)

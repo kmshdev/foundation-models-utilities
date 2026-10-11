@@ -4,8 +4,14 @@ import Observation
 
 @MainActor @Observable
 final class OutcomeDraft {
-    var text: String
-    init(text: String = "") { self.text = text }
+    var text: String {
+        didSet { if text != oldValue { didChange?() } }
+    }
+    @ObservationIgnored private let didChange: (@MainActor () -> Void)?
+    init(text: String = "", didChange: (@MainActor () -> Void)? = nil) {
+        self.text = text
+        self.didChange = didChange
+    }
 }
 
 @MainActor @Observable
@@ -21,6 +27,10 @@ final class StudioStore {
     @ObservationIgnored private var loadStarted = false
     @ObservationIgnored private var planningTask: Task<Void, Never>?
     @ObservationIgnored private var drafts: [UUID: OutcomeDraft] = [:]
+    @ObservationIgnored private var draftSaveTask: Task<Void, Never>?
+    @ObservationIgnored private var saveTask: Task<Bool, Never>?
+    @ObservationIgnored private var lastSaveRevision = 0
+    @ObservationIgnored private var saveFailure: String?
 
     init() {
         let directory = URL.applicationSupportDirectory.appendingPathComponent("EngineeringStudio", isDirectory: true)
@@ -31,20 +41,28 @@ final class StudioStore {
     /// Dependency injection for persistence checks; no user defaults are changed.
     init(repository: WorkspaceRepository) { self.repository = repository }
 
-    /// Retains unsent text across outcome/view switches for this app session.
+    /// Retains unsent text across outcome/view switches and app relaunches.
     /// The composer observes its own draft, so typing does not invalidate history.
     func draft(for outcomeID: UUID, initialText: String = "") -> OutcomeDraft {
         if let draft = drafts[outcomeID] { return draft }
-        let draft = OutcomeDraft(text: initialText)
+        let draft = OutcomeDraft(text: workspace.drafts[outcomeID] ?? initialText) { [weak self] in
+            self?.scheduleDraftSave()
+        }
         drafts[outcomeID] = draft
         return draft
     }
 
     @discardableResult func sendDraft(to outcomeID: UUID) -> Bool {
         let draft = draft(for: outcomeID)
-        guard send(draft.text, to: outcomeID) else { return false }
-        draft.text = ""
-        return true
+        guard isLoaded else { return false }
+        do {
+            try workspace.recordMessage(draft.text, for: outcomeID)
+            draft.text = ""
+            // One snapshot contains both the message and the cleared draft.
+            // Retry only writes this snapshot; it never records another message.
+            persist()
+            return true
+        } catch { failure = error.localizedDescription; return false }
     }
 
     #if DEBUG
@@ -62,6 +80,7 @@ final class StudioStore {
         guard !loadStarted else { return }; loadStarted = true
         do {
             workspace = try await repository.load()
+            lastSaveRevision = workspace.revision
             isLoaded = true; failure = nil; saveState = "Saved on this device"
         } catch {
             loadStarted = false
@@ -137,20 +156,65 @@ final class StudioStore {
 
     func retrySave() { persist() }
 
-    private func persist() {
-        let snapshot = workspace
+    /// Await at lifecycle boundaries; normal typing is saved after a short pause.
+    /// A false result leaves all edits in memory with retryable failure feedback.
+    @discardableResult func flushPendingChanges() async -> Bool {
+        guard isLoaded else { return false }
+        return await persist().value
+    }
+
+    private func scheduleDraftSave() {
+        draftSaveTask?.cancel()
+        guard isLoaded else { return }
+        draftSaveTask = Task { [weak self] in
+            do { try await Task.sleep(for: .milliseconds(250)) }
+            catch { return }
+            guard let self else { return }
+            self.persist()
+        }
+    }
+
+    @discardableResult private func persist() -> Task<Bool, Never> {
+        draftSaveTask?.cancel()
+        draftSaveTask = nil
+        var snapshot = workspace
+        for (id, draft) in drafts {
+            snapshot.drafts[id] = draft.text.isEmpty ? nil : draft.text
+        }
+        // Draft edits do not publish a workspace mutation on every keystroke.
+        // Assign the durable revision separately, at the snapshot boundary.
+        lastSaveRevision = max(lastSaveRevision, workspace.revision) + 1
+        snapshot.revision = lastSaveRevision
+        let revision = snapshot.revision
+        let precedingSave = saveTask
         saveState = "Saving…"
-        Task {
+        let task = Task { [snapshot] in
+            // An actor serializes each operation, not the order that independent
+            // Tasks reach it. Chain writes explicitly to preserve edit order.
+            if let precedingSave { _ = await precedingSave.value }
             do {
                 try await repository.save(snapshot)
-                if workspace.revision == snapshot.revision { saveState = "Saved on this device" }
+                if lastSaveRevision == revision {
+                    saveState = "Saved on this device"
+                    // Clear only this persistence error, not a newer planning or
+                    // input error that happens to be presented during the write.
+                    if failure == saveFailure { failure = nil }
+                    saveFailure = nil
+                }
+                return true
             } catch {
                 // An obsolete write must not overwrite newer save feedback. A
                 // conflict for the current revision is an error, never silent.
-                guard workspace.revision == snapshot.revision else { return }
-                saveState = "Changes not saved"
-                failure = "Could not save the workspace. Your changes remain in memory. \(error.localizedDescription)"
+                if lastSaveRevision == revision {
+                    saveState = "Changes not saved"
+                    let message = "Could not save the workspace. Your changes remain in memory. \(error.localizedDescription)"
+                    saveFailure = message
+                    failure = message
+                }
+                return false
             }
         }
+        saveTask = task
+        return task
     }
 }
