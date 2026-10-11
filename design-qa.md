@@ -23,6 +23,8 @@ The native preview host executes state regression checks against the real `Studi
 
 The preview pipeline now requires Xcode 27 / Swift 6.4 and typechecks both app scene branches and shared views against SDK 27. The screenshot host replaces FoundationPlanner with a disabled service. Full production builds compile the actual model service separately. Earlier stored captures retain their original SDK 26 provenance.
 
+At `7b54a8d`, [native builds and core tests](https://github.com/kmshdev/foundation-models-utilities/actions/runs/38158254209) and [SDK 27 preview/store checks](https://github.com/kmshdev/foundation-models-utilities/actions/runs/38158254245) passed. The checked-in captures now come from that SDK 27 run. Automatic planning regression checks verify latest-context coalescing, obsolete-result rejection, queue serialization, cancellation, error recovery and unanswered-question gating. Narrow-window connection text remains legible. Compact re-selection, sheet dismissal protection and VoiceOver choice traits have source/build validation; direct native interaction remains outstanding.
+
 ## Remaining acceptance work
 
 - Target-device interaction and model execution checks; the full SDK 27 targets and actual model service now compile.

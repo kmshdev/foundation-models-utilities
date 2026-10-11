@@ -56,6 +56,8 @@ The original review's decisions on semantic typography, native materials, purpos
 
 Additional Apple references: [interactive dismissal](https://developer.apple.com/documentation/swiftui/view/interactivedismissdisabled(_:)) and [selected accessibility trait](https://developer.apple.com/documentation/swiftui/accessibilitytraits/isselected).
 
+Validated at `7b54a8d`: [both production builds and 14 core tests passed](https://github.com/kmshdev/foundation-models-utilities/actions/runs/38158254209); [SDK 27 preview compilation, store regression checks and five native captures passed](https://github.com/kmshdev/foundation-models-utilities/actions/runs/38158254245). The planning checks cover late-result rejection, latest-context coalescing, serialized calls, independent outcomes, cancellation unwind, provider failure recovery and question gating. The narrow capture confirms the connection label is no longer truncated. Direct VoiceOver and iPhone navigation interaction remain unverified.
+
 Before a production claim:
 
 1. Complete signing/distribution and native interaction coverage. Both full SDK 27 targets, including the actual model service and utilities package, now build.
