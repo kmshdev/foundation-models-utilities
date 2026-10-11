@@ -35,7 +35,7 @@ final class NativeCommandRunner {
         process.standardOutput = output
         process.standardError = errors
         let started = ProcessInfo.processInfo.systemUptime
-        print("Running \(label) (deadline \(timeout)s): \(executable) \(arguments.joined(separator: " "))")
+        FileHandle.standardOutput.write(Data("Running \(label) (deadline \(timeout)s): \(executable) \(arguments.joined(separator: " "))\n".utf8))
         try process.run()
         while process.isRunning && ProcessInfo.processInfo.systemUptime - started < timeout {
             Thread.sleep(forTimeInterval: 0.05)
@@ -67,7 +67,7 @@ final class NativeCommandRunner {
         try encoder.encode(receipts).write(to: directory.appendingPathComponent("commands.json"), options: .atomic)
         try output.synchronize()
         try errors.synchronize()
-        print("Finished \(label): \(receipt.elapsedSeconds.formatted())s, status \(receipt.exitStatus.map(String.init) ?? "still running"), timed out \(timedOut).")
+        FileHandle.standardOutput.write(Data("Finished \(label): \(receipt.elapsedSeconds.formatted())s, status \(receipt.exitStatus.map(String.init) ?? "still running"), timed out \(timedOut).\n".utf8))
         if timedOut { throw NativeCommandError.timedOut(label, timeout) }
         guard process.terminationStatus == 0 else {
             throw NativeCommandError.failed(label, process.terminationStatus, try tail(errorURL))

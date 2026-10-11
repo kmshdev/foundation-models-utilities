@@ -3,6 +3,7 @@ import Foundation
 #if os(macOS)
 import AppKit
 import ImageIO
+import Darwin
 #endif
 
 @main
@@ -21,7 +22,8 @@ enum NativeSmoke {
         do { try await captureApplications(root: root, results: results, runner: runner) }
         catch {
             try? Data("\(error)\n".utf8).write(to: results.appendingPathComponent("failure.txt"), options: .atomic)
-            throw error
+            FileHandle.standardError.write(Data("Native launch check failed: \(error)\n".utf8))
+            exit(1)
         }
         #else
         throw NativeCommandError.invalidOutput("Production launch capture requires macOS and Xcode 27")
@@ -55,6 +57,7 @@ enum NativeSmoke {
         let macApp = products.appendingPathComponent("Debug/EngineeringStudioMac.app")
         try runner.run("toolchain", "/usr/bin/xcodebuild", ["-version"])
         try runner.run("swift-version", "/usr/bin/xcrun", ["swift", "--version"])
+        try runner.run("host-capacity", "/usr/sbin/sysctl", ["hw.memsize", "hw.ncpu"])
         try runner.run("simctl-help", "/usr/bin/xcrun", ["simctl", "help"])
         for subcommand in ["create", "bootstatus", "install", "launch", "spawn", "io"] {
             try runner.run("simctl-help-" + subcommand, "/usr/bin/xcrun", ["simctl", "help", subcommand])
@@ -89,8 +92,8 @@ enum NativeSmoke {
         let deviceID = String(decoding: created, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
         guard UUID(uuidString: deviceID) != nil else { throw NativeCommandError.invalidOutput("create-isolated-simulator") }
         defer {
-            try? runner.run("shutdown-isolated-simulator", "/usr/bin/xcrun", ["simctl", "shutdown", deviceID], timeout: 20)
-            try? runner.run("delete-isolated-simulator", "/usr/bin/xcrun", ["simctl", "delete", deviceID], timeout: 20)
+            _ = try? runner.run("shutdown-isolated-simulator", "/usr/bin/xcrun", ["simctl", "shutdown", deviceID], timeout: 20)
+            _ = try? runner.run("delete-isolated-simulator", "/usr/bin/xcrun", ["simctl", "delete", deviceID], timeout: 20)
         }
         do {
             try runner.run("boot-simulator", "/usr/bin/xcrun", ["simctl", "boot", deviceID], timeout: 30)
@@ -100,11 +103,19 @@ enum NativeSmoke {
             } else {
                 developerDirectory = String(decoding: try runner.run("developer-directory", "/usr/bin/xcode-select", ["-p"]), as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
             }
-            let applications = URL(fileURLWithPath: developerDirectory).appendingPathComponent("Applications")
-            if let host = ["Simulator.app", "DeviceHub.app"].map({ applications.appendingPathComponent($0) }).first(where: { FileManager.default.fileExists(atPath: $0.path) }) {
-                let arguments = host.lastPathComponent == "Simulator.app" ? [host.path, "--args", "-CurrentDeviceUDID", deviceID] : [host.path]
-                try runner.run("open-simulator-host", "/usr/bin/open", arguments)
+            let developer = URL(fileURLWithPath: developerDirectory)
+            let directories = [developer.appendingPathComponent("Applications"), developer.deletingLastPathComponent().appendingPathComponent("Applications"), URL(fileURLWithPath: "/Applications"), URL(fileURLWithPath: "/System/Applications")]
+            let applications = directories.flatMap { (try? FileManager.default.contentsOfDirectory(at: $0, includingPropertiesForKeys: nil)) ?? [] }.filter { $0.pathExtension == "app" }
+            try Data(applications.map(\.path).sorted().joined(separator: "\n").utf8).write(to: results.appendingPathComponent("installed-apple-apps.txt"), options: .atomic)
+            let matchingHosts = applications.filter {
+                let name = $0.deletingPathExtension().lastPathComponent.lowercased().filter(\.isLetter)
+                return name == "simulator" || name == "devicehub"
             }
+            let selectedXcodeContents = developer.deletingLastPathComponent().path + "/"
+            let host = matchingHosts.first(where: { $0.path.hasPrefix(selectedXcodeContents) }) ?? NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.iphonesimulator") ?? matchingHosts.first
+            guard let host else { throw NativeCommandError.invalidOutput("Simulator/Device Hub GUI host was not found; inspect installed-apple-apps.txt") }
+            let arguments = host.lastPathComponent == "Simulator.app" ? [host.path, "--args", "-CurrentDeviceUDID", deviceID] : [host.path]
+            try runner.run("open-simulator-host", "/usr/bin/open", arguments)
             try runner.run("await-boot", "/usr/bin/xcrun", ["simctl", "bootstatus", deviceID, "-b"], timeout: 180)
             let iosApp = products.appendingPathComponent("Debug-iphonesimulator/EngineeringStudioiOS.app")
             try runner.run("install-ios", "/usr/bin/xcrun", ["simctl", "install", deviceID, iosApp.path], timeout: 60)
@@ -133,10 +144,10 @@ enum NativeSmoke {
             try JSONSerialization.data(withJSONObject: evidence, options: [.prettyPrinted, .sortedKeys]).write(to: results.appendingPathComponent("launch-evidence.json"), options: .atomic)
             print("Production iOS app remains running as process \(pid) on isolated \(runtime.key). Inspect both screenshots for startup UI.")
         } catch {
-            try? runner.run("diagnostic-devices", "/usr/bin/xcrun", ["simctl", "list", "devices", "--json"], timeout: 15)
-            try? runner.run("diagnostic-simulator-processes", "/usr/bin/xcrun", ["simctl", "spawn", deviceID, "launchctl", "list"], timeout: 15)
-            try? runner.run("diagnostic-app-log", "/usr/bin/xcrun", ["simctl", "spawn", deviceID, "log", "show", "--last", "2m", "--style", "compact", "--predicate", "process == \"EngineeringStudioiOS\""], timeout: 20)
-            try? runner.run("diagnostic-host-processes", "/bin/ps", ["-axo", "pid,ppid,stat,etime,command"], timeout: 10)
+            _ = try? runner.run("diagnostic-devices", "/usr/bin/xcrun", ["simctl", "list", "devices", "--json"], timeout: 15)
+            _ = try? runner.run("diagnostic-simulator-processes", "/usr/bin/xcrun", ["simctl", "spawn", deviceID, "launchctl", "list"], timeout: 15)
+            _ = try? runner.run("diagnostic-app-log", "/usr/bin/xcrun", ["simctl", "spawn", deviceID, "log", "show", "--last", "2m", "--style", "compact", "--predicate", "process == \"EngineeringStudioiOS\""], timeout: 20)
+            _ = try? runner.run("diagnostic-host-processes", "/bin/ps", ["-axo", "pid,ppid,stat,etime,command"], timeout: 10)
             throw error
         }
     }
