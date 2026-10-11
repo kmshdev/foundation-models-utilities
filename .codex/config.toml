@@ -1,0 +1,100 @@
+# Development role library; runtime capacity may impose a lower limit.
+# Explicit registration supports clients that do not discover standalone profiles.
+[agents]
+max_concurrent_threads_per_session = 8
+
+[agents.agents-orchestrator]
+description = "Coordinate the Codex development team to complete the user\u2019s authorized app work."
+config_file = "agents/agents-orchestrator.toml"
+
+[agents.design-ui-designer]
+description = "Maintain a coherent native Apple visual system and verify its implementation."
+config_file = "agents/design-ui-designer.toml"
+
+[agents.design-ux-architect]
+description = "Design native navigation and interaction architecture for continuous engineering work."
+config_file = "agents/design-ux-architect.toml"
+
+[agents.design-visual-storyteller]
+description = "Explain complex engineering progress through truthful, accessible visual narratives."
+config_file = "agents/design-visual-storyteller.toml"
+
+[agents.design-whimsy-injector]
+description = "Refine purposeful native feedback without distracting from engineering work."
+config_file = "agents/design-whimsy-injector.toml"
+
+[agents.engineering-backend-architect]
+description = "Implement bounded Swift service, persistence and external API integrations."
+config_file = "agents/engineering-backend-architect.toml"
+
+[agents.engineering-codebase-onboarding-engineer]
+description = "Explain this repository through inspected code and real execution paths."
+config_file = "agents/engineering-codebase-onboarding-engineer.toml"
+
+[agents.engineering-developer-tooling-engineer]
+description = "Build reliable Swift developer tools and reproducible Apple build workflows."
+config_file = "agents/engineering-developer-tooling-engineer.toml"
+
+[agents.engineering-git-workflow-master]
+description = "Keep development branches, diffs and integration history safe and reviewable."
+config_file = "agents/engineering-git-workflow-master.toml"
+
+[agents.engineering-knowledge-graph-engineer]
+description = "Make task context, code relationships and evidence discoverable with provenance."
+config_file = "agents/engineering-knowledge-graph-engineer.toml"
+
+[agents.engineering-minimal-change-engineer]
+description = "Fix a bounded Swift defect with the smallest correct, reviewable change."
+config_file = "agents/engineering-minimal-change-engineer.toml"
+
+[agents.engineering-mobile-app-builder]
+description = "Implement native SwiftUI iOS and macOS features with platform-appropriate behavior."
+config_file = "agents/engineering-mobile-app-builder.toml"
+
+[agents.engineering-multi-agent-systems-architect]
+description = "Design reliable Swift coordination contracts for the app\u2019s eight specialist bots."
+config_file = "agents/engineering-multi-agent-systems-architect.toml"
+
+[agents.engineering-software-architect]
+description = "Define maintainable Swift module boundaries and explicit engineering tradeoffs."
+config_file = "agents/engineering-software-architect.toml"
+
+[agents.engineering-technical-writer]
+description = "Write accurate developer documentation, Swift API references and runnable tutorials."
+config_file = "agents/engineering-technical-writer.toml"
+
+[agents.engineering-universal-document-compiler]
+description = "Design lossless Swift document models and native reporting only when an assigned feature needs them."
+config_file = "agents/engineering-universal-document-compiler.toml"
+
+[agents.product-dx-engineer]
+description = "Make the app and utilities approachable to developers with fewer unnecessary steps."
+config_file = "agents/product-dx-engineer.toml"
+
+[agents.product-manager]
+description = "Translate the personal engineering coordinator\u2019s user outcomes into focused product requirements."
+config_file = "agents/product-manager.toml"
+
+[agents.research-synthesist]
+description = "Resolve technical uncertainty through scoped, source-backed research."
+config_file = "agents/research-synthesist.toml"
+
+[agents.specialized-master-plan-architect]
+description = "Produce a concrete implementation plan grounded in this app\u2019s code and constraints."
+config_file = "agents/specialized-master-plan-architect.toml"
+
+[agents.specialized-workflow-architect]
+description = "Specify observable end-to-end behavior for outcome intake, execution and handoffs."
+config_file = "agents/specialized-workflow-architect.toml"
+
+[agents.testing-reality-checker]
+description = "Independently verify product claims against source, native behavior and retained evidence."
+config_file = "agents/testing-reality-checker.toml"
+
+[agents.testing-tool-evaluator]
+description = "Evaluate SDKs, services, plugins and developer tools against this Swift app\u2019s requirements."
+config_file = "agents/testing-tool-evaluator.toml"
+
+[agents.testing-workflow-optimizer]
+description = "Reduce measured friction in build, review and bot handoff workflows."
+config_file = "agents/testing-workflow-optimizer.toml"

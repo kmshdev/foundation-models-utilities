@@ -1,0 +1,751 @@
+{
+  "schema_version": 1,
+  "installed_at": "2026-10-11",
+  "scope": "local global Codex skills; no app implementation dependencies",
+  "cli_version": "1.7.2",
+  "skills": [
+    {
+      "name": "craft-design-engineering",
+      "source_repository": "https://github.com/gustavo-fior/craft",
+      "source_commit": "e0d176e163fb2236b3de9415aaf73ea3aab09d1c",
+      "source_path": "skills/craft-design-engineering",
+      "source_url": "https://github.com/gustavo-fior/craft/blob/e0d176e163fb2236b3de9415aaf73ea3aab09d1c/skills/craft-design-engineering/SKILL.md",
+      "source_sha256": "630366c9c57ac16eda597286d791e157a0b0af312e45b3d79952e3cb050773d5",
+      "installed_path": "/home/agent/.agents/skills/craft-design-engineering",
+      "installed_sha256": "47b685a9b69c7b4244f444be128b7157163b32803fde7262cb181e589f033603",
+      "target_agents": [
+        "codex"
+      ],
+      "installer": "npx --yes skills@1.7.2 add <pinned-local-source> --agent codex --global --yes --copy",
+      "status": "installed",
+      "transformations": [
+        "Engineering Studio precedence and native SwiftUI usage adaptation"
+      ],
+      "license_files": [],
+      "validation": {
+        "frontmatter": true,
+        "source_exists": true,
+        "installed_exists": true,
+        "codex_discovery": {
+          "method": "skills/list",
+          "forceReload": true,
+          "scope": "user",
+          "enabled": true,
+          "occurrences": 1,
+          "date": "2026-10-11"
+        }
+      }
+    },
+    {
+      "name": "swiftui-pro",
+      "source_repository": "https://github.com/twostraws/SwiftUI-Agent-Skill",
+      "source_commit": "f9800713b24580bc444931949aad4519128605e8",
+      "source_path": "swiftui-pro",
+      "source_url": "https://github.com/twostraws/SwiftUI-Agent-Skill/blob/f9800713b24580bc444931949aad4519128605e8/swiftui-pro/SKILL.md",
+      "source_sha256": "c88c396456ccd3e1feb18070283352fd8db1c92c0a64ae59d7fe0032674c0129",
+      "installed_path": "/home/agent/.agents/skills/swiftui-pro",
+      "installed_sha256": "e1f2089ab41e6e5350569460a7d435cff9cccb8dfd3d3dea042a87c84ed242bb",
+      "target_agents": [
+        "codex"
+      ],
+      "installer": "npx --yes skills@1.7.2 add <pinned-local-source> --agent codex --global --yes --copy",
+      "status": "installed",
+      "transformations": [
+        "Engineering Studio precedence and native SwiftUI usage adaptation",
+        "Excluded nested alternative-agent/plugin packaging and duplicate skills from skill-only installation: .claude-plugin, skills"
+      ],
+      "license_files": [
+        "strategy/licenses/skills/twostraws--SwiftUI-Agent-Skill/LICENSE"
+      ],
+      "validation": {
+        "frontmatter": true,
+        "source_exists": true,
+        "installed_exists": true,
+        "codex_discovery": {
+          "method": "skills/list",
+          "forceReload": true,
+          "scope": "user",
+          "enabled": true,
+          "occurrences": 1,
+          "date": "2026-10-11"
+        }
+      }
+    },
+    {
+      "name": "sota-mobile",
+      "source_repository": "https://github.com/martinholovsky/SOTA-skills",
+      "source_commit": "6e96ea8af1a3f8bb4d2cc5fc8869672c943ab4cb",
+      "source_path": "skills/sota-mobile",
+      "source_url": "https://github.com/martinholovsky/SOTA-skills/blob/6e96ea8af1a3f8bb4d2cc5fc8869672c943ab4cb/skills/sota-mobile/SKILL.md",
+      "source_sha256": "fcf1687de8ee27caa562d190174d7eebb9c9d77118616b1250d604aedcccdc1e",
+      "installed_path": "/home/agent/.agents/skills/sota-mobile",
+      "installed_sha256": "b74e4e124c818f6b28f0ea7296cb08e71206b19a84b9f5d7dc4416517110f433",
+      "target_agents": [
+        "codex"
+      ],
+      "installer": "npx --yes skills@1.7.2 add <pinned-local-source> --agent codex --global --yes --copy",
+      "status": "installed",
+      "transformations": [
+        "Engineering Studio precedence and native SwiftUI usage adaptation"
+      ],
+      "license_files": [
+        "strategy/licenses/skills/martinholovsky--SOTA-skills/LICENSE",
+        "strategy/licenses/skills/martinholovsky--SOTA-skills/LICENSE-APACHE"
+      ],
+      "validation": {
+        "frontmatter": true,
+        "source_exists": true,
+        "installed_exists": true,
+        "codex_discovery": {
+          "method": "skills/list",
+          "forceReload": true,
+          "scope": "user",
+          "enabled": true,
+          "occurrences": 1,
+          "date": "2026-10-11"
+        }
+      }
+    },
+    {
+      "name": "sota-swift",
+      "source_repository": "https://github.com/martinholovsky/SOTA-skills",
+      "source_commit": "6e96ea8af1a3f8bb4d2cc5fc8869672c943ab4cb",
+      "source_path": "skills/sota-swift",
+      "source_url": "https://github.com/martinholovsky/SOTA-skills/blob/6e96ea8af1a3f8bb4d2cc5fc8869672c943ab4cb/skills/sota-swift/SKILL.md",
+      "source_sha256": "bbcfb22145d9dfe50e26eede96a1e1f0a31c14fea5d0cc1388be66d5f6eaedcd",
+      "installed_path": "/home/agent/.agents/skills/sota-swift",
+      "installed_sha256": "c2099e2b52dd5ff805bb5d10264c390de3b15de6b0eb2d45fc075565e9975075",
+      "target_agents": [
+        "codex"
+      ],
+      "installer": "npx --yes skills@1.7.2 add <pinned-local-source> --agent codex --global --yes --copy",
+      "status": "installed",
+      "transformations": [
+        "Engineering Studio precedence and native SwiftUI usage adaptation"
+      ],
+      "license_files": [
+        "strategy/licenses/skills/martinholovsky--SOTA-skills/LICENSE",
+        "strategy/licenses/skills/martinholovsky--SOTA-skills/LICENSE-APACHE"
+      ],
+      "validation": {
+        "frontmatter": true,
+        "source_exists": true,
+        "installed_exists": true,
+        "codex_discovery": {
+          "method": "skills/list",
+          "forceReload": true,
+          "scope": "user",
+          "enabled": true,
+          "occurrences": 1,
+          "date": "2026-10-11"
+        }
+      }
+    },
+    {
+      "name": "orchestrate-batch-refactor",
+      "source_repository": "https://github.com/Dimillian/Skills",
+      "source_commit": "05ba982bfeb0d77d3c97d4542b0ee15034d05f84",
+      "source_path": "orchestrate-batch-refactor",
+      "source_url": "https://github.com/Dimillian/Skills/blob/05ba982bfeb0d77d3c97d4542b0ee15034d05f84/orchestrate-batch-refactor/SKILL.md",
+      "source_sha256": "b7bd20ed6cdb93a89c4c7c70c21554d838189d310904ca516144036c9cf8d506",
+      "installed_path": "/home/agent/.agents/skills/orchestrate-batch-refactor",
+      "installed_sha256": "84b3ceef7783ac04d34e6277f98efc2645ed7f6cb9bdf174557c2b0ceb1661d2",
+      "target_agents": [
+        "codex"
+      ],
+      "installer": "npx --yes skills@1.7.2 add <pinned-local-source> --agent codex --global --yes --copy",
+      "status": "installed",
+      "transformations": [
+        "Engineering Studio precedence and native SwiftUI usage adaptation"
+      ],
+      "license_files": [
+        "strategy/licenses/skills/Dimillian--Skills/LICENSE"
+      ],
+      "validation": {
+        "frontmatter": true,
+        "source_exists": true,
+        "installed_exists": true,
+        "codex_discovery": {
+          "method": "skills/list",
+          "forceReload": true,
+          "scope": "user",
+          "enabled": true,
+          "occurrences": 1,
+          "date": "2026-10-11"
+        }
+      }
+    },
+    {
+      "name": "agent-memory-repo",
+      "source_repository": "https://github.com/AgentMemoryRepo/agentmemoryrepo",
+      "source_commit": "8798cb26c817d451a5ed6cba0ad8d9eca8d5ec3e",
+      "source_path": "skills/agent-memory-repo",
+      "source_url": "https://github.com/AgentMemoryRepo/agentmemoryrepo/blob/8798cb26c817d451a5ed6cba0ad8d9eca8d5ec3e/skills/agent-memory-repo/SKILL.md",
+      "source_sha256": "5b254acb3e4f6d1b3baa170ae4b283e2e38153b54fbe7a4b51193d826185cb44",
+      "installed_path": "/home/agent/.agents/skills/agent-memory-repo",
+      "installed_sha256": "8e3bb5ea9e160bbc12eb2b1b35fafc393879037aaae441fbf2e027d7831b6b9d",
+      "target_agents": [
+        "codex"
+      ],
+      "installer": "npx --yes skills@1.7.2 add <pinned-local-source> --agent codex --global --yes --copy",
+      "status": "installed",
+      "transformations": [
+        "Engineering Studio precedence and native SwiftUI usage adaptation",
+        "Installation does not create or synchronize a memory repository. Keep memory separate and local when invoked; no secrets or automatic remote publication."
+      ],
+      "license_files": [
+        "strategy/licenses/skills/AgentMemoryRepo--agentmemoryrepo/LICENSE"
+      ],
+      "validation": {
+        "frontmatter": true,
+        "source_exists": true,
+        "installed_exists": true,
+        "codex_discovery": {
+          "method": "skills/list",
+          "forceReload": true,
+          "scope": "user",
+          "enabled": true,
+          "occurrences": 1,
+          "date": "2026-10-11"
+        }
+      }
+    },
+    {
+      "name": "ios-agent-skill",
+      "source_repository": "https://github.com/Nagarjuna2997/ios-agent-skill",
+      "source_commit": "26369af889b27914d87342a1922bcac3b2921f5a",
+      "source_path": ".",
+      "source_url": "https://github.com/Nagarjuna2997/ios-agent-skill/blob/26369af889b27914d87342a1922bcac3b2921f5a/SKILL.md",
+      "source_sha256": "ba7deedb6d25256d4978f35fd56f9037060228e2a42ea59bf02a11ffaa548371",
+      "installed_path": "/home/agent/.agents/skills/ios-agent-skill",
+      "installed_sha256": "0ecfc6dce3d1ca7aeae0ca405f858f4c141cd83f34d9b6123aed49833b2d2b0f",
+      "target_agents": [
+        "codex"
+      ],
+      "installer": "npx --yes skills@1.7.2 add <pinned-local-source> --agent codex --global --yes --copy",
+      "status": "installed",
+      "transformations": [
+        "Engineering Studio precedence and native SwiftUI usage adaptation",
+        "Do not automatically open public issue drafts or maintainer reporting links. Report evidence in the current chat; use official Apple documentation or installed SDK declarations when the optional Apple docs MCP is unavailable. No MCP server or package hooks are installed by this skill copy.",
+        "Excluded nested alternative-agent/plugin packaging and duplicate skills from skill-only installation: plugins, .claude, .github, gemini-extension.json, install.sh"
+      ],
+      "license_files": [
+        "strategy/licenses/skills/Nagarjuna2997--ios-agent-skill/LICENSE"
+      ],
+      "validation": {
+        "frontmatter": true,
+        "source_exists": true,
+        "installed_exists": true,
+        "codex_discovery": {
+          "method": "skills/list",
+          "forceReload": true,
+          "scope": "user",
+          "enabled": true,
+          "occurrences": 1,
+          "date": "2026-10-11"
+        }
+      }
+    },
+    {
+      "name": "harness-eval",
+      "source_repository": "https://github.com/tech-leads-club/agent-skills",
+      "source_commit": "6df68d52028b9261058231e0f4998048c0352f45",
+      "source_path": "packages/skills-catalog/skills/(development)/harness-eval",
+      "source_url": "https://github.com/tech-leads-club/agent-skills/blob/6df68d52028b9261058231e0f4998048c0352f45/packages/skills-catalog/skills/(development)/harness-eval/SKILL.md",
+      "source_sha256": "a245e8ca2a6c42aad8912b633f7956221ec8fb0501dec03e493fd3ad279e4499",
+      "installed_path": "/home/agent/.agents/skills/harness-eval",
+      "installed_sha256": "68e064cd6fcc7667be3466e84be91252339fb653a2adefeba13b0aa6cbddf98d",
+      "target_agents": [
+        "codex"
+      ],
+      "installer": "npx --yes skills@1.7.2 add <pinned-local-source> --agent codex --global --yes --copy",
+      "status": "installed",
+      "transformations": [
+        "Engineering Studio precedence and native SwiftUI usage adaptation",
+        "For an ordinary authorized audit, default to deterministic Track A, omit optional external docs, and record that scope without requiring Q1/Q2 approvals. Run costly B/C judges only when requested or already within the authorized audit scope and available budget. Installation alone does not invoke any track."
+      ],
+      "license_files": [
+        "strategy/licenses/skills/tech-leads-club--agent-skills/LICENSE"
+      ],
+      "validation": {
+        "frontmatter": true,
+        "source_exists": true,
+        "installed_exists": true,
+        "codex_discovery": {
+          "method": "skills/list",
+          "forceReload": true,
+          "scope": "user",
+          "enabled": true,
+          "occurrences": 1,
+          "date": "2026-10-11"
+        }
+      }
+    },
+    {
+      "name": "not-your-babysitter",
+      "source_repository": "https://github.com/tech-leads-club/agent-skills",
+      "source_commit": "6df68d52028b9261058231e0f4998048c0352f45",
+      "source_path": "packages/skills-catalog/skills/(development)/not-your-babysitter",
+      "source_url": "https://github.com/tech-leads-club/agent-skills/blob/6df68d52028b9261058231e0f4998048c0352f45/packages/skills-catalog/skills/(development)/not-your-babysitter/SKILL.md",
+      "source_sha256": "64acfc23e0fdb478e506eb2678c8848228db95deefbdc2146153780bbea1ffc7",
+      "installed_path": "/home/agent/.agents/skills/not-your-babysitter",
+      "installed_sha256": "2a5293e23b547e80e99f1864bc169e7497de0fcb8286d1d14b1b9f20156209b2",
+      "target_agents": [
+        "codex"
+      ],
+      "installer": "npx --yes skills@1.7.2 add <pinned-local-source> --agent codex --global --yes --copy",
+      "status": "installed",
+      "transformations": [
+        "Engineering Studio precedence and native SwiftUI usage adaptation"
+      ],
+      "license_files": [
+        "strategy/licenses/skills/tech-leads-club--agent-skills/LICENSE"
+      ],
+      "validation": {
+        "frontmatter": true,
+        "source_exists": true,
+        "installed_exists": true,
+        "codex_discovery": {
+          "method": "skills/list",
+          "forceReload": true,
+          "scope": "user",
+          "enabled": true,
+          "occurrences": 1,
+          "date": "2026-10-11"
+        }
+      }
+    },
+    {
+      "name": "gh-fix-ci",
+      "source_repository": "https://github.com/tech-leads-club/agent-skills",
+      "source_commit": "6df68d52028b9261058231e0f4998048c0352f45",
+      "source_path": "packages/skills-catalog/skills/(tooling)/gh-fix-ci",
+      "source_url": "https://github.com/tech-leads-club/agent-skills/blob/6df68d52028b9261058231e0f4998048c0352f45/packages/skills-catalog/skills/(tooling)/gh-fix-ci/SKILL.md",
+      "source_sha256": "5eda940fb7f3614fa84ca7a0e0f7da716cdb7605b1b64e4da3f170c60669ecdb",
+      "installed_path": "/home/agent/.agents/skills/gh-fix-ci",
+      "installed_sha256": "934d069a50836d6c2dd00cdc0ed2870222541a2a9c027f85c57c7eacbe50e90c",
+      "target_agents": [
+        "codex"
+      ],
+      "installer": "npx --yes skills@1.7.2 add <pinned-local-source> --agent codex --global --yes --copy",
+      "status": "installed",
+      "transformations": [
+        "Engineering Studio precedence and native SwiftUI usage adaptation",
+        "A user request to fix CI authorizes scoped investigation and reversible fixes. State the plan briefly, apply the fix and verify; do not repeat approval requests for planning, implementation or already-authorized draft PR creation."
+      ],
+      "license_files": [
+        "strategy/licenses/skills/tech-leads-club--agent-skills/LICENSE"
+      ],
+      "validation": {
+        "frontmatter": true,
+        "source_exists": true,
+        "installed_exists": true,
+        "codex_discovery": {
+          "method": "skills/list",
+          "forceReload": true,
+          "scope": "user",
+          "enabled": true,
+          "occurrences": 1,
+          "date": "2026-10-11"
+        }
+      }
+    },
+    {
+      "name": "create-adr",
+      "source_repository": "https://github.com/tech-leads-club/agent-skills",
+      "source_commit": "6df68d52028b9261058231e0f4998048c0352f45",
+      "source_path": "packages/skills-catalog/skills/(creation)/create-adr",
+      "source_url": "https://github.com/tech-leads-club/agent-skills/blob/6df68d52028b9261058231e0f4998048c0352f45/packages/skills-catalog/skills/(creation)/create-adr/SKILL.md",
+      "source_sha256": "cde8b63afba27bcbbe22e46de64ed63287314233c331420bc33f50abdde06d1a",
+      "installed_path": "/home/agent/.agents/skills/create-adr",
+      "installed_sha256": "bd925143f81b4479bcbbb919bab4293e51860672e1022a9ad68543c1a7096946",
+      "target_agents": [
+        "codex"
+      ],
+      "installer": "npx --yes skills@1.7.2 add <pinned-local-source> --agent codex --global --yes --copy",
+      "status": "installed",
+      "transformations": [
+        "Engineering Studio precedence and native SwiftUI usage adaptation",
+        "Reuse recorded decisions, infer routine format choices from the repository, and save the requested ADR without a redundant placement approval. Do not invent an accepted decision when it remains proposed."
+      ],
+      "license_files": [
+        "strategy/licenses/skills/tech-leads-club--agent-skills/LICENSE"
+      ],
+      "validation": {
+        "frontmatter": true,
+        "source_exists": true,
+        "installed_exists": true,
+        "codex_discovery": {
+          "method": "skills/list",
+          "forceReload": true,
+          "scope": "user",
+          "enabled": true,
+          "occurrences": 1,
+          "date": "2026-10-11"
+        }
+      }
+    },
+    {
+      "name": "create-rfc",
+      "source_repository": "https://github.com/tech-leads-club/agent-skills",
+      "source_commit": "6df68d52028b9261058231e0f4998048c0352f45",
+      "source_path": "packages/skills-catalog/skills/(creation)/create-rfc",
+      "source_url": "https://github.com/tech-leads-club/agent-skills/blob/6df68d52028b9261058231e0f4998048c0352f45/packages/skills-catalog/skills/(creation)/create-rfc/SKILL.md",
+      "source_sha256": "8947fde8782d1632a96582e29ae05e43e4267155f56aa81a96312599f8d8bdca",
+      "installed_path": "/home/agent/.agents/skills/create-rfc",
+      "installed_sha256": "4988417bc1ea8013ee980009aeb17954a40d3ab6583db3bac9c4144ed4f3a95c",
+      "target_agents": [
+        "codex"
+      ],
+      "installer": "npx --yes skills@1.7.2 add <pinned-local-source> --agent codex --global --yes --copy",
+      "status": "installed",
+      "transformations": [
+        "Engineering Studio precedence and native SwiftUI usage adaptation",
+        "Reuse known context and mark open decisions. Do not make routine document drafting contingent on format questionnaires or offer external publication without a relevant user request."
+      ],
+      "license_files": [
+        "strategy/licenses/skills/tech-leads-club--agent-skills/LICENSE"
+      ],
+      "validation": {
+        "frontmatter": true,
+        "source_exists": true,
+        "installed_exists": true,
+        "codex_discovery": {
+          "method": "skills/list",
+          "forceReload": true,
+          "scope": "user",
+          "enabled": true,
+          "occurrences": 1,
+          "date": "2026-10-11"
+        }
+      }
+    },
+    {
+      "name": "technical-design-doc-creator",
+      "source_repository": "https://github.com/tech-leads-club/agent-skills",
+      "source_commit": "6df68d52028b9261058231e0f4998048c0352f45",
+      "source_path": "packages/skills-catalog/skills/(creation)/create-technical-design-doc",
+      "source_url": "https://github.com/tech-leads-club/agent-skills/blob/6df68d52028b9261058231e0f4998048c0352f45/packages/skills-catalog/skills/(creation)/create-technical-design-doc/SKILL.md",
+      "source_sha256": "6e628b009e85276f8e7a63d1f323cc7ec5f7a02e261344c7df7f94e9ecfdb47b",
+      "installed_path": "/home/agent/.agents/skills/technical-design-doc-creator",
+      "installed_sha256": "c76f6ad6af35b26f62c3e4a414027c8ce2dcf346c83f2cac14b28178c5853d14",
+      "target_agents": [
+        "codex"
+      ],
+      "installer": "npx --yes skills@1.7.2 add <pinned-local-source> --agent codex --global --yes --copy",
+      "status": "installed",
+      "transformations": [
+        "Engineering Studio precedence and native SwiftUI usage adaptation",
+        "Use existing project and conversation facts. Mark unresolved facts explicitly and ask only questions that block the document goal; no mandatory questionnaire, optional-section checklist or Confluence publication prompt. Save requested documentation in the repository conventions."
+      ],
+      "license_files": [
+        "strategy/licenses/skills/tech-leads-club--agent-skills/LICENSE"
+      ],
+      "validation": {
+        "frontmatter": true,
+        "source_exists": true,
+        "installed_exists": true,
+        "codex_discovery": {
+          "method": "skills/list",
+          "forceReload": true,
+          "scope": "user",
+          "enabled": true,
+          "occurrences": 1,
+          "date": "2026-10-11"
+        }
+      }
+    },
+    {
+      "name": "planning-with-files",
+      "source_repository": "https://github.com/OthmanAdi/planning-with-files",
+      "source_commit": "7056ed2f2b86a8a9e18840f625ac66a48fa07693",
+      "source_path": "skills/planning-with-files",
+      "source_url": "https://github.com/OthmanAdi/planning-with-files/blob/7056ed2f2b86a8a9e18840f625ac66a48fa07693/skills/planning-with-files/SKILL.md",
+      "source_sha256": "77fc96bcf402ce8cf119a6272791a587d29a539102713c06fbe6b01ae82de104",
+      "installed_path": "/home/agent/.agents/skills/planning-with-files",
+      "installed_sha256": "0953c7cdfb3857874fc4eb564a9b7aa913835941cd3309b3ec2d178b46de586a",
+      "target_agents": [
+        "codex"
+      ],
+      "installer": "npx --yes skills@1.7.2 add <pinned-local-source> --agent codex --global --yes --copy",
+      "status": "installed",
+      "transformations": [
+        "Engineering Studio precedence and native SwiftUI usage adaptation",
+        "Removed Claude lifecycle hooks from frontmatter; manual Codex planning only",
+        "Claude-specific hook declarations are removed from this Codex copy. Use manual task-owned planning files; do not install hooks, change lifecycle configuration, assume /goal or /loop commands exist, or read session transcripts unless explicitly requested. All script paths resolve relative to this installed directory."
+      ],
+      "license_files": [
+        "strategy/licenses/skills/OthmanAdi--planning-with-files/LICENSE"
+      ],
+      "validation": {
+        "frontmatter": true,
+        "source_exists": true,
+        "installed_exists": true,
+        "codex_discovery": {
+          "method": "skills/list",
+          "forceReload": true,
+          "scope": "user",
+          "enabled": true,
+          "occurrences": 1,
+          "date": "2026-10-11"
+        }
+      }
+    },
+    {
+      "name": "component-extract",
+      "source_repository": "https://github.com/Trystan-SA/claude-design-system-prompt",
+      "source_commit": "3c3ddb07d7aa3fef051d83608596470c95cfd8fe",
+      "source_path": "codex/skills/component-extract.md",
+      "source_url": "https://github.com/Trystan-SA/claude-design-system-prompt/blob/3c3ddb07d7aa3fef051d83608596470c95cfd8fe/codex/skills/component-extract.md",
+      "source_sha256": "57484d81130fb21118bc5caad4ed6ac6b5bab35f3c74c2dfd1bec6a0a361d574",
+      "installed_path": "/home/agent/.agents/skills/component-extract",
+      "installed_sha256": "1f13a7533611dc5c6753dc131d95d1401046053c2b2dacb6662562a77b04ad1e",
+      "target_agents": [
+        "codex"
+      ],
+      "installer": "npx --yes skills@1.7.2 add <pinned-local-source> --agent codex --global --yes --copy",
+      "status": "installed",
+      "transformations": [
+        "Engineering Studio precedence and native SwiftUI usage adaptation",
+        "Added valid Codex SKILL.md frontmatter",
+        "Adapted web component/token extraction outputs to SwiftUI, SF Symbols and semantic materials"
+      ],
+      "license_files": [
+        "strategy/licenses/skills/Trystan-SA--claude-design-system-prompt/LICENSE"
+      ],
+      "validation": {
+        "frontmatter": true,
+        "source_exists": true,
+        "installed_exists": true,
+        "codex_discovery": {
+          "method": "skills/list",
+          "forceReload": true,
+          "scope": "user",
+          "enabled": true,
+          "occurrences": 1,
+          "date": "2026-10-11"
+        }
+      }
+    },
+    {
+      "name": "design-system-extract",
+      "source_repository": "https://github.com/Trystan-SA/claude-design-system-prompt",
+      "source_commit": "3c3ddb07d7aa3fef051d83608596470c95cfd8fe",
+      "source_path": "codex/skills/design-system-extract.md",
+      "source_url": "https://github.com/Trystan-SA/claude-design-system-prompt/blob/3c3ddb07d7aa3fef051d83608596470c95cfd8fe/codex/skills/design-system-extract.md",
+      "source_sha256": "06ee22b8e2447c69c76c70beb980b2a2d192921b3e913b49cbc753c631e7ce4b",
+      "installed_path": "/home/agent/.agents/skills/design-system-extract",
+      "installed_sha256": "db71ffc3b7c423791a6805317d8a98793e17333095452eb2821257464838dcd9",
+      "target_agents": [
+        "codex"
+      ],
+      "installer": "npx --yes skills@1.7.2 add <pinned-local-source> --agent codex --global --yes --copy",
+      "status": "installed",
+      "transformations": [
+        "Engineering Studio precedence and native SwiftUI usage adaptation",
+        "Added valid Codex SKILL.md frontmatter",
+        "Adapted web component/token extraction outputs to SwiftUI, SF Symbols and semantic materials"
+      ],
+      "license_files": [
+        "strategy/licenses/skills/Trystan-SA--claude-design-system-prompt/LICENSE"
+      ],
+      "validation": {
+        "frontmatter": true,
+        "source_exists": true,
+        "installed_exists": true,
+        "codex_discovery": {
+          "method": "skills/list",
+          "forceReload": true,
+          "scope": "user",
+          "enabled": true,
+          "occurrences": 1,
+          "date": "2026-10-11"
+        }
+      }
+    },
+    {
+      "name": "apple-design",
+      "source_repository": "https://github.com/boraoztunc/skills",
+      "source_commit": "645553ca7622570479e330cc089c65fcf34e0ba8",
+      "source_path": "apple-design",
+      "source_url": "https://github.com/boraoztunc/skills/blob/645553ca7622570479e330cc089c65fcf34e0ba8/apple-design/SKILL.md",
+      "source_sha256": "11840b24a11d7f94f39c6aaab074750ae4e4de4ef54ee4b1dd97e16ebd485e61",
+      "installed_path": "/home/agent/.agents/skills/apple-design",
+      "installed_sha256": "196843451a785a4e47ff03b81078006ef808f2187918fee86cba245689c105a7",
+      "target_agents": [
+        "codex"
+      ],
+      "installer": "npx --yes skills@1.7.2 add <pinned-local-source> --agent codex --global --yes --copy",
+      "status": "installed",
+      "transformations": [
+        "Engineering Studio precedence and native SwiftUI usage adaptation"
+      ],
+      "license_files": [
+        "strategy/licenses/skills/boraoztunc--skills/LICENSE-hyperframes",
+        "strategy/licenses/skills/boraoztunc--skills/LICENSE-jakubkrehel",
+        "strategy/licenses/skills/boraoztunc--skills/LICENSE-liamgvchi",
+        "strategy/licenses/skills/boraoztunc--skills/LICENSE-mengto-skills"
+      ],
+      "validation": {
+        "frontmatter": true,
+        "source_exists": true,
+        "installed_exists": true,
+        "codex_discovery": {
+          "method": "skills/list",
+          "forceReload": true,
+          "scope": "user",
+          "enabled": true,
+          "occurrences": 1,
+          "date": "2026-10-11"
+        }
+      }
+    },
+    {
+      "name": "write-swift",
+      "source_repository": "https://github.com/emilkowalski/skills",
+      "source_commit": "2d228630ba1446365f614a108cb8252f1feda202",
+      "source_path": "skills/write-swift",
+      "source_url": "https://github.com/emilkowalski/skills/blob/2d228630ba1446365f614a108cb8252f1feda202/skills/write-swift/SKILL.md",
+      "source_sha256": "16a4b6adb74e338e55e704ce5753ad54d825438b8a63930eeaede9f3c04c9447",
+      "installed_path": "/home/agent/.agents/skills/write-swift",
+      "installed_sha256": "b85b2f2bd615bcee93fdcff1aa2b65717c5ffa0d27301aeeedfa9e10329c36ee",
+      "target_agents": [
+        "codex"
+      ],
+      "installer": "npx --yes skills@1.7.2 add <pinned-local-source> --agent codex --global --yes --copy",
+      "status": "installed",
+      "transformations": [
+        "Engineering Studio precedence and native SwiftUI usage adaptation"
+      ],
+      "license_files": [
+        "strategy/licenses/skills/emilkowalski--skills/LICENSE"
+      ],
+      "validation": {
+        "frontmatter": true,
+        "source_exists": true,
+        "installed_exists": true,
+        "codex_discovery": {
+          "method": "skills/list",
+          "forceReload": true,
+          "scope": "user",
+          "enabled": true,
+          "occurrences": 1,
+          "date": "2026-10-11"
+        }
+      }
+    },
+    {
+      "name": "animation-vocabulary",
+      "source_repository": "https://github.com/emilkowalski/skills",
+      "source_commit": "2d228630ba1446365f614a108cb8252f1feda202",
+      "source_path": "skills/animation-vocabulary",
+      "source_url": "https://github.com/emilkowalski/skills/blob/2d228630ba1446365f614a108cb8252f1feda202/skills/animation-vocabulary/SKILL.md",
+      "source_sha256": "40d2b27adfdfeb0570a9f20e7d0255109d9233c50603878bcd0dcd04c923fd94",
+      "installed_path": "/home/agent/.agents/skills/animation-vocabulary",
+      "installed_sha256": "44914b9461d983ecee6a466e99120a30d613962266c9e79febe078f75e71236c",
+      "target_agents": [
+        "codex"
+      ],
+      "installer": "npx --yes skills@1.7.2 add <pinned-local-source> --agent codex --global --yes --copy",
+      "status": "installed",
+      "transformations": [
+        "Engineering Studio precedence and native SwiftUI usage adaptation"
+      ],
+      "license_files": [
+        "strategy/licenses/skills/emilkowalski--skills/LICENSE"
+      ],
+      "validation": {
+        "frontmatter": true,
+        "source_exists": true,
+        "installed_exists": true,
+        "codex_discovery": {
+          "method": "skills/list",
+          "forceReload": true,
+          "scope": "user",
+          "enabled": true,
+          "occurrences": 1,
+          "date": "2026-10-11"
+        }
+      }
+    },
+    {
+      "name": "find-animation-opportunities",
+      "source_repository": "https://github.com/emilkowalski/skills",
+      "source_commit": "2d228630ba1446365f614a108cb8252f1feda202",
+      "source_path": "skills/find-animation-opportunities",
+      "source_url": "https://github.com/emilkowalski/skills/blob/2d228630ba1446365f614a108cb8252f1feda202/skills/find-animation-opportunities/SKILL.md",
+      "source_sha256": "d52a377819b84a71930f0c822cfe2849f40301605a2d5c7eccbfa3b257700df2",
+      "installed_path": "/home/agent/.agents/skills/find-animation-opportunities",
+      "installed_sha256": "e5252a0a06786420ea741d96a96a6ae4508934d648d9a71d4e027dfb574ec046",
+      "target_agents": [
+        "codex"
+      ],
+      "installer": "npx --yes skills@1.7.2 add <pinned-local-source> --agent codex --global --yes --copy",
+      "status": "installed",
+      "transformations": [
+        "Engineering Studio precedence and native SwiftUI usage adaptation"
+      ],
+      "license_files": [
+        "strategy/licenses/skills/emilkowalski--skills/LICENSE"
+      ],
+      "validation": {
+        "frontmatter": true,
+        "source_exists": true,
+        "installed_exists": true,
+        "codex_discovery": {
+          "method": "skills/list",
+          "forceReload": true,
+          "scope": "user",
+          "enabled": true,
+          "occurrences": 1,
+          "date": "2026-10-11"
+        }
+      }
+    },
+    {
+      "name": "improve-animations",
+      "source_repository": "https://github.com/emilkowalski/skills",
+      "source_commit": "2d228630ba1446365f614a108cb8252f1feda202",
+      "source_path": "skills/improve-animations",
+      "source_url": "https://github.com/emilkowalski/skills/blob/2d228630ba1446365f614a108cb8252f1feda202/skills/improve-animations/SKILL.md",
+      "source_sha256": "73962447464433476343e2c12cd08ab39cc99a9e5f3c118c5fb54ed897574ef6",
+      "installed_path": "/home/agent/.agents/skills/improve-animations",
+      "installed_sha256": "35a669db38571c25ecdc87b1721acd76a9e8f0244c023eff2758c3b37c53453f",
+      "target_agents": [
+        "codex"
+      ],
+      "installer": "npx --yes skills@1.7.2 add <pinned-local-source> --agent codex --global --yes --copy",
+      "status": "installed",
+      "transformations": [
+        "Engineering Studio precedence and native SwiftUI usage adaptation",
+        "For a requested audit, deliver the audit; for an already-requested implementation, select supported high-value fixes within scope and proceed without a second selection gate. Keep the audit read-only when implementation was not requested. Native SwiftUI behavior and accessibility take precedence over CSS timings and web libraries."
+      ],
+      "license_files": [
+        "strategy/licenses/skills/emilkowalski--skills/LICENSE"
+      ],
+      "validation": {
+        "frontmatter": true,
+        "source_exists": true,
+        "installed_exists": true,
+        "codex_discovery": {
+          "method": "skills/list",
+          "forceReload": true,
+          "scope": "user",
+          "enabled": true,
+          "occurrences": 1,
+          "date": "2026-10-11"
+        }
+      }
+    }
+  ],
+  "validation_summary": {
+    "requested": 21,
+    "installed": 21,
+    "discovered_enabled": 21,
+    "duplicate_requested_names": 0,
+    "parse_errors": 0,
+    "other_agents_selected": [],
+    "host": "Codex CLI app-server 0.159.0-alpha.3",
+    "current_chat_skill_catalog_hot_reloaded": false
+  }
+}

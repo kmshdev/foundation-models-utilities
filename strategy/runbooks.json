@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "playbook": "playbooks/native-delivery.md",
+  "coordination": "coordination/handoff-templates.md",
+  "selection": "Choose only necessary roles, respect runtime capacity, and assign disjoint write ownership.",
+  "runbooks": [
+    {
+      "id": "native-feature",
+      "trigger": "A new or revised SwiftUI product behavior",
+      "roles": ["product-manager", "design-ux-architect", "design-ui-designer", "engineering-mobile-app-builder", "testing-reality-checker"],
+      "deliverable": "Native behavior with acceptance evidence, build results and relevant captures"
+    },
+    {
+      "id": "coordinator-and-services",
+      "trigger": "Presence, ownership, model access, service delivery or context handoff",
+      "roles": ["engineering-multi-agent-systems-architect", "specialized-workflow-architect", "engineering-backend-architect", "testing-reality-checker"],
+      "deliverable": "Swift contracts and integrations with real service receipts and failure recovery"
+    },
+    {
+      "id": "bounded-defect",
+      "trigger": "A reproducible regression or CI failure",
+      "roles": ["engineering-minimal-change-engineer", "engineering-developer-tooling-engineer"],
+      "deliverable": "Small verified correction and exact regression evidence"
+    },
+    {
+      "id": "research-decision",
+      "trigger": "Uncertain API, SDK, provider or infrastructure support",
+      "roles": ["research-synthesist", "testing-tool-evaluator", "engineering-software-architect"],
+      "deliverable": "Primary sources, bounded experiment, supported decision and explicit limitations"
+    },
+    {
+      "id": "cross-module-delivery",
+      "trigger": "A substantial outcome spanning independent modules",
+      "roles": ["agents-orchestrator", "specialized-master-plan-architect", "engineering-software-architect", "engineering-mobile-app-builder", "engineering-backend-architect", "testing-reality-checker", "engineering-git-workflow-master"],
+      "deliverable": "Dependency plan, exclusive ownership, verified handoffs and integrated behavior"
+    },
+    {
+      "id": "developer-experience",
+      "trigger": "Onboarding, documentation, developer tooling or measured workflow friction",
+      "roles": ["engineering-codebase-onboarding-engineer", "product-dx-engineer", "engineering-technical-writer", "testing-workflow-optimizer"],
+      "deliverable": "Accurate executable setup or workflow improvement with observed results"
+    },
+    {
+      "id": "knowledge-and-reporting",
+      "trigger": "Document export, evidence navigation or relationship indexing",
+      "roles": ["engineering-universal-document-compiler", "engineering-knowledge-graph-engineer", "design-visual-storyteller"],
+      "deliverable": "Provenance-preserving Swift data flow and accessible presentation"
+    },
+    {
+      "id": "interaction-refinement",
+      "trigger": "A focused refinement to native feedback, motion or microcopy",
+      "roles": ["design-ui-designer", "design-whimsy-injector", "engineering-mobile-app-builder"],
+      "deliverable": "Purposeful native feedback verified with reduced-motion and accessibility behavior"
+    }
+  ]
+}

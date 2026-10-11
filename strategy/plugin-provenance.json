@@ -1,0 +1,13 @@
+{
+  "plugin": "interfaces@interfaces",
+  "version": "1.10.3",
+  "source": "https://github.com/jakubkrehel/skills",
+  "commit": "c0588bb6d654eb725046f0bf9deec338c34891ab",
+  "license": "MIT (declared by upstream plugin manifest)",
+  "cli": "codex-cli 0.159.0-alpha.3",
+  "installed": true,
+  "enabled": true,
+  "target": "Codex only",
+  "verification": "codex plugin list --marketplace interfaces --json",
+  "hosted_chat_catalog_hot_reloaded": false
+}
