@@ -51,10 +51,14 @@ try run(["swiftc"] + iosCommon + ["-parse-as-library", "-emit-module", "-module-
 try run(["swiftc"] + iosCommon + ["-typecheck", "-parse-as-library", "-I", iosOutput.path] + appSources + [
         root.appendingPathComponent("Tools/SwiftUIPreview/PreviewPlanner.swift").path,
         root.appendingPathComponent("Apps/EngineeringStudio/EngineeringStudioApp.swift").path])
+try run(["swiftc"] + common + ["-typecheck", "-parse-as-library", "-I", output.path] + appSources + [
+        root.appendingPathComponent("Tools/SwiftUIPreview/PreviewPlanner.swift").path,
+        root.appendingPathComponent("Apps/EngineeringStudio/EngineeringStudioApp.swift").path])
 try run(["swiftc"] + common + ["-parse-as-library", "-I", output.path, "-L", output.path, "-lEngineeringCore",
         "-o", executables.appendingPathComponent("SwiftUIPreview").path] + appSources + [
         root.appendingPathComponent("Tools/SwiftUIPreview/PreviewPlanner.swift").path,
-        root.appendingPathComponent("Tools/SwiftUIPreview/PreviewHost.swift").path])
+        root.appendingPathComponent("Tools/SwiftUIPreview/PreviewHost.swift").path,
+        root.appendingPathComponent("Tools/SwiftUIPreview/StoreChecks.swift").path])
 try run(["actool", root.appendingPathComponent("Apps/EngineeringStudio/Assets.xcassets").path,
         "--compile", resources.path, "--platform", "macosx", "--minimum-deployment-target", "26.0"])
 let info: [String: Any] = ["CFBundleExecutable": "SwiftUIPreview", "CFBundleIdentifier": "dev.kmsh.engineeringstudio.preview",

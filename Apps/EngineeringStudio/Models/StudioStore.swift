@@ -3,6 +3,12 @@ import Foundation
 import Observation
 
 @MainActor @Observable
+final class OutcomeDraft {
+    var text: String
+    init(text: String = "") { self.text = text }
+}
+
+@MainActor @Observable
 final class StudioStore {
     private(set) var workspace = Workspace()
     private(set) var isLoaded = false
@@ -12,13 +18,33 @@ final class StudioStore {
     var failure: String?
     var usesOnDeviceModel = false
     private let repository: WorkspaceRepository
-    private var loadStarted = false
-    private var planningTask: Task<Void, Never>?
+    @ObservationIgnored private var loadStarted = false
+    @ObservationIgnored private var planningTask: Task<Void, Never>?
+    @ObservationIgnored private var drafts: [UUID: OutcomeDraft] = [:]
 
     init() {
         let directory = URL.applicationSupportDirectory.appendingPathComponent("EngineeringStudio", isDirectory: true)
         repository = WorkspaceRepository(url: directory.appendingPathComponent("workspace.json"))
         usesOnDeviceModel = UserDefaults.standard.bool(forKey: "usesOnDeviceModel")
+    }
+
+    /// Dependency injection for persistence checks; no user defaults are changed.
+    init(repository: WorkspaceRepository) { self.repository = repository }
+
+    /// Retains unsent text across outcome/view switches for this app session.
+    /// The composer observes its own draft, so typing does not invalidate history.
+    func draft(for outcomeID: UUID, initialText: String = "") -> OutcomeDraft {
+        if let draft = drafts[outcomeID] { return draft }
+        let draft = OutcomeDraft(text: initialText)
+        drafts[outcomeID] = draft
+        return draft
+    }
+
+    @discardableResult func sendDraft(to outcomeID: UUID) -> Bool {
+        let draft = draft(for: outcomeID)
+        guard send(draft.text, to: outcomeID) else { return false }
+        draft.text = ""
+        return true
     }
 
     #if DEBUG
@@ -36,8 +62,12 @@ final class StudioStore {
         guard !loadStarted else { return }; loadStarted = true
         do {
             workspace = try await repository.load()
-            isLoaded = true; saveState = "Saved on this device"
-        } catch { failure = "Could not open the workspace. \(error.localizedDescription)"; saveState = "Workspace unavailable" }
+            isLoaded = true; failure = nil; saveState = "Saved on this device"
+        } catch {
+            loadStarted = false
+            failure = "Could not open the workspace. \(error.localizedDescription)"
+            saveState = "Workspace unavailable"
+        }
     }
 
     func setOnDeviceModel(_ enabled: Bool) {
@@ -114,9 +144,10 @@ final class StudioStore {
             do {
                 try await repository.save(snapshot)
                 if workspace.revision == snapshot.revision { saveState = "Saved on this device" }
-            } catch WorkspaceError.staleRevision {
-                // Another write from this store has already persisted the newer snapshot.
             } catch {
+                // An obsolete write must not overwrite newer save feedback. A
+                // conflict for the current revision is an error, never silent.
+                guard workspace.revision == snapshot.revision else { return }
                 saveState = "Changes not saved"
                 failure = "Could not save the workspace. Your changes remain in memory. \(error.localizedDescription)"
             }

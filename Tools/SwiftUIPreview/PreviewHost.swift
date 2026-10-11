@@ -19,6 +19,7 @@ private final class CaptureDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         Task {
             do {
+                try await checkStudioStore()
                 let output = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
                 try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
                 var workspace = Workspace()
@@ -57,6 +58,8 @@ private final class CaptureDelegate: NSObject, NSApplicationDelegate {
                                   name: "03-empty-workspace", width: 1280, height: 820, output: output)
                 try await capture(StudioRootView(store: store, initialOutcomeID: outcomeID, initialTaskID: "core-01"),
                                   name: "04-increased-contrast", width: 1280, height: 858, output: output, highContrast: true)
+                try await capture(StudioRootView(store: store, initialOutcomeID: outcomeID, initialTaskID: "core-01"),
+                                  name: "05-light-workspace", width: 1280, height: 858, output: output, scheme: .light)
                 print("Captured real native SwiftUI views with preview data. Services disabled.")
                 NSApp.terminate(nil)
             } catch {
@@ -66,10 +69,10 @@ private final class CaptureDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func capture<Content: View>(_ content: Content, name: String, width: CGFloat, height: CGFloat, output: URL, highContrast: Bool = false) async throws {
+    private func capture<Content: View>(_ content: Content, name: String, width: CGFloat, height: CGFloat, output: URL, highContrast: Bool = false, scheme: ColorScheme = .dark) async throws {
         let root = content
             .frame(width: width, height: height)
-            .preferredColorScheme(.dark)
+            .preferredColorScheme(scheme)
             // Explicit preview traits keep standard and accessibility captures
             // reproducible. Production views inherit the user's display settings.
             .environment(\.legibilityWeight, highContrast ? .bold : .regular)
@@ -82,7 +85,7 @@ private final class CaptureDelegate: NSObject, NSApplicationDelegate {
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.toolbarStyle = .unified
-        window.appearance = NSAppearance(named: highContrast ? .accessibilityHighContrastDarkAqua : .darkAqua)
+        window.appearance = NSAppearance(named: highContrast ? .accessibilityHighContrastDarkAqua : (scheme == .dark ? .darkAqua : .aqua))
         window.contentView = host
         window.center()
         window.makeKeyAndOrderFront(nil)

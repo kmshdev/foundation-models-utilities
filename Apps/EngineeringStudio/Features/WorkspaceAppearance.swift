@@ -1,37 +1,45 @@
 import EngineeringCore
 import SwiftUI
 
-/// Decorative workspace color lives below semantic system materials, never in
-/// a rasterized imitation of glass. Accessibility settings retain their effect.
-struct StudioBackdrop: View {
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    var body: some View {
-        ZStack {
-            Color(red: 0.075, green: 0.115, blue: 0.17)
-            if !reduceTransparency {
-                LinearGradient(colors: [.blue.opacity(0.20), .clear, .blue.opacity(0.10)],
-                               startPoint: .topLeading, endPoint: .bottomTrailing)
-                RadialGradient(colors: [.blue.opacity(0.23), .clear], center: .bottomLeading,
-                               startRadius: 0, endRadius: 620)
-                RadialGradient(colors: [.blue.opacity(0.12), .clear], center: .topTrailing,
-                               startRadius: 0, endRadius: 600)
-            }
-        }.ignoresSafeArea()
+enum StudioSpacing {
+    static let small: CGFloat = 8
+    static let medium: CGFloat = 12
+    static let standard: CGFloat = 16
+    static let section: CGFloat = 24
+    static let group: CGFloat = 32
+}
+enum StudioRadius {
+    static let control: CGFloat = 12
+    static let container: CGFloat = 20
+}
+
+enum StudioTypography {
+    static let title = Font.title2.weight(.semibold)
+    static let heading = Font.headline
+    static let label = Font.subheadline.weight(.semibold)
+    static let secondary = Font.callout
+    static let caption = Font.caption
+    static var body: Font {
+        #if os(macOS)
+        .system(size: 15)
+        #else
+        .body
+        #endif
     }
+}
+
+struct StudioBackdrop: View {
+    var body: some View { Rectangle().fill(.background).ignoresSafeArea() }
 }
 
 struct WorkspacePanel: ViewModifier {
     @Environment(\.colorSchemeContrast) private var contrast
     func body(content: Content) -> some View {
         content
-            .background {
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(LinearGradient(colors: [.white.opacity(0.07), .clear], startPoint: .topLeading, endPoint: .bottomTrailing))
-            }
-            .background(.thinMaterial, in: .rect(cornerRadius: 20))
+            .background(.thinMaterial, in: .rect(cornerRadius: StudioRadius.container))
             .overlay {
-                RoundedRectangle(cornerRadius: 20)
-                    .strokeBorder(.white.opacity(contrast == .increased ? 0.55 : 0.17), lineWidth: 1)
+                RoundedRectangle(cornerRadius: StudioRadius.container)
+                    .strokeBorder(.primary.opacity(contrast == .increased ? 0.45 : 0.10))
                     .allowsHitTesting(false)
             }
     }
@@ -41,18 +49,14 @@ struct SymbolBadge: View {
     let symbol: String
     var size: CGFloat = 48
     var tint: Color = .primary
+    @ScaledMetric(relativeTo: .body) private var scale = 1.0
     var body: some View {
         Image(systemName: symbol)
             .symbolRenderingMode(.hierarchical)
-            .font(.system(size: size * 0.47, weight: .regular))
+            .font(.system(size: size * scale * 0.47))
             .foregroundStyle(tint)
-            .frame(width: size, height: size)
-            .background {
-                Circle().fill(LinearGradient(colors: [.white.opacity(0.20), .white.opacity(0.025)],
-                                             startPoint: .topLeading, endPoint: .bottomTrailing))
-            }
-            .background(.thinMaterial, in: .circle)
-            .overlay { Circle().strokeBorder(.white.opacity(0.17), lineWidth: 1) }
+            .frame(width: size * scale, height: size * scale)
+            .background(.quaternary, in: .circle)
             .accessibilityHidden(true)
     }
 }

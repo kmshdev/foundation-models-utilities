@@ -10,7 +10,10 @@ private enum StudioSheet: String, Identifiable {
 }
 
 struct StudioRootView: View {
-    @Bindable var store: StudioStore
+    let store: StudioStore
+    #if os(macOS)
+    @Environment(\.openSettings) private var openSettings
+    #endif
     private let initialDraft: String
     @State private var destination: WorkspaceDestination?
     @State private var selectedTaskID: String?
@@ -47,8 +50,7 @@ struct StudioRootView: View {
     var body: some View {
         workspaceColumns
         .background { StudioBackdrop() }
-        .preferredColorScheme(.dark)
-        .font(.system(size: 16))
+        .font(StudioTypography.body)
         .tint(StudioStyle.accent)
         #if os(macOS)
         .overlay(alignment: .bottomTrailing) {
@@ -56,7 +58,7 @@ struct StudioRootView: View {
                 Text(store.saveState)
                 if store.saveState == "Changes not saved" { Button("Retry") { store.retrySave() } }
             }
-            .font(.system(size: 11)).foregroundStyle(.secondary)
+            .font(StudioTypography.caption).foregroundStyle(.secondary)
             .padding(.trailing, 20).padding(.bottom, 12)
         }
         #endif
@@ -68,7 +70,7 @@ struct StudioRootView: View {
                     VStack(alignment: .leading, spacing: 1) {
                         Text(outcome.map { String($0.text.prefix(45)) } ?? "Engineering")
                             .font(.system(size: 18, weight: .semibold))
-                        Text("Engineering").font(.system(size: 14)).foregroundStyle(.secondary)
+                        Text("Engineering").font(StudioTypography.secondary).foregroundStyle(.secondary)
                     }
                 }.padding(.leading, 116)
             }.sharedBackgroundVisibility(.hidden)
@@ -81,7 +83,7 @@ struct StudioRootView: View {
                             TextField("Search", text: $search).textFieldStyle(.plain)
                                 .accessibilityLabel("Search outcomes")
                         }
-                        .font(.system(size: 15)).padding(.horizontal, 14).frame(width: 164, height: 38)
+                        .font(StudioTypography.body).padding(.horizontal, 14).frame(width: 164, height: 38)
                         .glassEffect(.regular, in: .capsule)
                         Button { sheet = .newOutcome } label: {
                             Image(systemName: "square.and.pencil").font(.system(size: 18)).frame(width: 40, height: 40)
@@ -89,7 +91,7 @@ struct StudioRootView: View {
                         }
                         .buttonStyle(.plain)
                         .keyboardShortcut("n", modifiers: .command)
-                        .accessibilityLabel("New outcome").help("Start a new outcome")
+                        .accessibilityLabel("New outcome").help("Start a new outcome").disabled(!store.isLoaded)
                         Button {
                             store.cancelPlanning()
                         } label: {
@@ -103,8 +105,7 @@ struct StudioRootView: View {
                         .help(store.isPlanning ? "Cancel planning" : "Developer execution is not connected yet")
                         Menu {
                             Button("Developers", systemImage: "person.2") { sheet = .team }
-                            Button("Settings", systemImage: "gearshape") { sheet = .settings }
-                                .keyboardShortcut(",", modifiers: .command)
+                            Button("Settings", systemImage: "gearshape") { openSettings() }
                         } label: {
                             Image(systemName: "ellipsis").font(.system(size: 18)).frame(width: 40, height: 40)
                                 .glassEffect(.regular, in: .circle)
@@ -117,6 +118,7 @@ struct StudioRootView: View {
             #else
             ToolbarItem(placement: .primaryAction) {
                 Button("New outcome", systemImage: "square.and.pencil") { sheet = .newOutcome }
+                    .disabled(!store.isLoaded)
             }
             ToolbarItem(placement: .primaryAction) {
                 Menu("More", systemImage: "ellipsis") {
@@ -184,7 +186,15 @@ struct StudioRootView: View {
 
     private var conversationColumn: some View {
         Group {
-            if let outcome {
+            if !store.isLoaded {
+                ContentUnavailableView {
+                    Label(store.saveState, systemImage: "externaldrive")
+                } description: {
+                    Text("Your workspace must open before you can make changes.")
+                } actions: {
+                    Button("Retry") { Task { await store.load() } }
+                }
+            } else if let outcome {
                 EngineeringRoomView(store: store, outcome: outcome, selectedTaskID: $selectedTaskID, initialDraft: initialDraft)
                     .id(outcome.id)
             } else { outcomeList }
@@ -222,11 +232,11 @@ struct StudioRootView: View {
                         Image(systemName: "person.2").font(.system(size: 22)).frame(width: 26)
                         VStack(alignment: .leading, spacing: 7) {
                             Text("Developers")
-                            Label("0 connected", systemImage: "circle").font(.system(size: 13)).foregroundStyle(.secondary)
+                            Label("0 connected", systemImage: "circle").font(StudioTypography.caption).foregroundStyle(.secondary)
                         }
                         Spacer(minLength: 0)
                         Text(Specialty.allCases.count, format: .number).foregroundStyle(.secondary)
-                        Image(systemName: "chevron.right").font(.system(size: 11)).foregroundStyle(.secondary)
+                        Image(systemName: "chevron.right").font(StudioTypography.caption).foregroundStyle(.secondary)
                     }.padding(.horizontal, 14).padding(.vertical, 12).contentShape(.rect)
                 }.buttonStyle(.plain)
             }.padding(.horizontal, 8).padding(.top, 16)
@@ -249,22 +259,22 @@ struct StudioRootView: View {
         } label: {
             HStack(spacing: 14) {
                 Image(systemName: symbol).font(.system(size: 21)).frame(width: 26)
-                Text(title).font(.system(size: 16)).lineLimit(2)
+                Text(title).font(StudioTypography.body).lineLimit(2)
                 Spacer(minLength: 0)
                 if let count {
-                    Text(count, format: .number).font(.system(size: 14))
+                    Text(count, format: .number).font(StudioTypography.secondary)
                         .padding(.horizontal, 10).padding(.vertical, 4).background(.thinMaterial, in: .capsule)
                 }
             }
-            .padding(.horizontal, 14).frame(minHeight: 43).contentShape(.rect)
+            .padding(.horizontal, 14).frame(minHeight: 44).contentShape(.rect)
             .background {
                 if destination == value {
-                    RoundedRectangle(cornerRadius: 11).fill(StudioStyle.accent.gradient)
-                        .overlay { RoundedRectangle(cornerRadius: 11).strokeBorder(.white.opacity(0.24)) }
+                    RoundedRectangle(cornerRadius: StudioRadius.control).fill(StudioStyle.accent)
                 }
             }
         }
         .buttonStyle(.plain)
+        .foregroundStyle(destination == value ? Color.white : Color.primary)
         .accessibilityAddTraits(destination == value ? [.isSelected] : [])
     }
 
@@ -361,7 +371,7 @@ private struct NewOutcomeView: View {
 }
 
 enum StudioStyle {
-    static let accent = Color(red: 0.08, green: 0.35, blue: 0.94)
+    static let accent = Color.accentColor
     static let paper = Color.clear
 }
 
