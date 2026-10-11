@@ -15,7 +15,9 @@ struct EngineeringStudioApp: App {
         .defaultSize(width: 1280, height: 858)
         .windowToolbarStyle(.unified(showsTitle: false))
         .windowResizability(.contentMinSize)
+        #endif
 
+        #if os(macOS)
         Settings {
             StudioSettingsView(store: store)
                 .frame(width: 560, height: 620)
