@@ -212,10 +212,13 @@ final class ServiceConnections {
         defer { publishingOutcomeID = nil }
         let client = LinearService(credential: .personalAPIKey(token), transport: transport)
         do {
+            try validatePublicationPlan(plan, outcomeID: outcome.id, store: store)
             for (index, task) in plan.tasks.enumerated() {
                 try Task.checkCancellation()
+                try validatePublicationPlan(plan, outcomeID: outcome.id, store: store)
                 // No network mutation occurs before the reserved ID is durable.
                 let binding = try await store.prepareIssuePublication(outcomeID: outcome.id, task: task)
+                try validatePublicationPlan(plan, outcomeID: outcome.id, store: store)
                 let description = issueDescription(task: task, outcome: outcome)
                 let issue: LinearIssue
                 if binding.identifier != nil {
@@ -227,16 +230,47 @@ final class ServiceConnections {
                         // A prior attempt may have reached Linear before its
                         // response or local receipt was lost. Reuse the same UUID.
                         guard let recovered = try? await client.issue(id: binding.issueID.uuidString) else { throw error }
+                        // The create may already have completed remotely. Retain its
+                        // receipt even if assignments changed while recovering it.
+                        // A UUID alone does not prove this task snapshot was sent:
+                        // the remote issue may belong to an earlier attempt's plan.
+                        if recovered.title == task.title && recovered.description == description {
+                            try await store.recordIssuePublication(outcomeID: outcome.id, task: task, issue: recovered)
+                        }
+                        try validatePublicationPlan(plan, outcomeID: outcome.id, store: store)
                         issue = try await client.updateIssue(id: recovered.id, title: task.title, description: description)
                     }
                 }
                 try await store.recordIssuePublication(outcomeID: outcome.id, task: task, issue: issue)
+                // Never discard a completed request's receipt, but stop before
+                // sending further tasks from a plan replaced during that request.
+                try validatePublicationPlan(plan, outcomeID: outcome.id, store: store)
                 publicationStatus = "Published \(index + 1) of \(plan.tasks.count) tasks"
             }
             await refreshLinear()
         } catch {
             publicationError = error.localizedDescription
             publicationStatus = "Publication paused · Saved receipts are retained"
+        }
+    }
+
+    private func validatePublicationPlan(_ plan: WorkPlan, outcomeID: UUID, store: StudioStore) throws {
+        guard store.workspace.outcomes.first(where: { $0.id == outcomeID })?.plan == plan else {
+            throw PublicationError.planChanged
+        }
+        guard store.planningOutcomeID != outcomeID, !store.isQueuedForPlanning(outcomeID) else {
+            throw PublicationError.planningInProgress
+        }
+    }
+
+    private enum PublicationError: LocalizedError {
+        case planChanged
+        case planningInProgress
+        var errorDescription: String? {
+            switch self {
+            case .planChanged: "Plan changed; review current assignments and publish again."
+            case .planningInProgress: "Assignments are being prepared. Wait for planning to finish, then publish again."
+            }
         }
     }
 

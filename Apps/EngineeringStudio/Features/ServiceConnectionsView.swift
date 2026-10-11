@@ -71,7 +71,7 @@ struct ServiceConnectionsView: View {
                     Link("Manage Linear API keys", destination: URL(string: "https://linear.app/settings/account/security")!)
                     Button("Save Linear connection") {
                         Task { if await connections.connectLinear(token: linearToken) { linearToken = "" } }
-                    }.disabled(linearToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || connections.refreshingLinear)
+                    }.disabled(linearToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || connections.refreshingLinear || connections.publishingOutcomeID != nil)
                     if connections.hasLinearCredential {
                         Button("Disconnect Linear", role: .destructive) { connections.disconnectLinear() }
                             .disabled(connections.refreshingLinear || connections.publishingOutcomeID != nil)
@@ -124,7 +124,7 @@ struct PlanPublishingControls: View {
                     store.issueBinding(outcomeID: outcome.id, taskID: $0.id)?.publishedTask == $0
                 }.count
                 if linkedCount > 0 {
-                    Text("\(linkedCount) of \(plan.tasks.count) tasks synced to Linear. Developer execution is separate.")
+                    Text("\(linkedCount) of \(plan.tasks.count) tasks published to Linear. Developer execution is separate.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }

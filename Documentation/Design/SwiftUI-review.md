@@ -61,7 +61,7 @@ Validated at `7b54a8d`: [both production builds and 14 core tests passed](https:
 Before a production claim:
 
 1. Complete signing/distribution and native interaction coverage. Both full SDK 27 targets, including the actual model service and utilities package, now build.
-2. Complete a documented, supported personal ChatGPT subscription transport; GitHub/Linear authentication and scope enforcement; connected Swift developer execution and heartbeats; verified handoffs, tests and pull requests. These are unfinished product integrations, not UI polish.
+2. Complete the documented personal ChatGPT subscription transport, connected Swift developer execution and heartbeats, and verified handoffs/test/PR receipts. GitHub/Linear clients, scope enforcement, Keychain settings, issue intake and durable publication are implemented; task execution and end-to-end account/device behavior remain unfinished.
 3. Validate VoiceOver, keyboard traversal, sheets, live divider resizing, compact iPhone navigation and accessibility text sizes on native targets. Static screenshots cannot prove these behaviors.
 4. Exercise lifecycle behavior on devices. Draft relaunch persistence, ordered writes, atomic send/clear and failed-save retry are implemented and regression-tested. Normal Mac quit waits for flush; force termination before a debounced write can still lose the most recent keystrokes.
 5. Measure large histories with Instruments, establish UI integration coverage and verify release signing/distribution. No runtime performance improvement is quantified without profiling.

@@ -100,6 +100,8 @@ func checkServiceConnections() async throws {
     try savedData.write(to: url, options: .atomic)
     try serviceRequire(await store.flushPendingChanges(), "Test store flush completes after disk recovery")
 
+    try await checkPublicationStopsOnPlanChange(in: directory)
+
     connections.disconnectLinear()
     try serviceRequire(vault.values["linear"] == nil && !connections.hasLinearCredential &&
                        connections.project == nil && connections.issues.isEmpty && connections.linearUpdatedAt == nil &&
@@ -138,6 +140,14 @@ func checkServiceConnections() async throws {
     var rejectProject = false
     var failReads = false
     var loseNextCreateResponse = false
+    var pauseNextCreateResponse = false
+    private var pausedCreateResponse: CheckedContinuation<Void, Never>?
+    var createResponseIsPaused: Bool { pausedCreateResponse != nil }
+    func resumeCreateResponse() {
+        let continuation = pausedCreateResponse
+        pausedCreateResponse = nil
+        continuation?.resume()
+    }
     var created: [String: [String: Any]] = [:]
     var createAttempts = 0
     var updateAttempts = 0
@@ -163,8 +173,16 @@ func checkServiceConnections() async throws {
             guard let input = variables["input"] as? [String: Any], let id = input["id"] as? String else {
                 throw serviceFailure("Creation requires the durable reserved UUID")
             }
-            guard created[id] == nil else { throw ServiceClientError.graphQL }
-            created[id] = issue(id: id, title: input["title"] as? String ?? "Untitled")
+            let existed = created[id] != nil
+            if !existed {
+                created[id] = issue(id: id, title: input["title"] as? String ?? "Untitled")
+                created[id]?["description"] = input["description"]
+            }
+            if pauseNextCreateResponse {
+                pauseNextCreateResponse = false
+                await withCheckedContinuation { pausedCreateResponse = $0 }
+            }
+            if existed { throw ServiceClientError.graphQL }
             if loseNextCreateResponse {
                 loseNextCreateResponse = false
                 throw URLError(.networkConnectionLost)
@@ -198,6 +216,11 @@ func checkServiceConnections() async throws {
         throw serviceFailure("Unexpected GraphQL operation")
     }
 
+    func seedIssue(id: String, title: String, description: String) {
+        created[id] = issue(id: id, title: title)
+        created[id]?["description"] = description
+    }
+
     private func issue(id: String, title: String) -> [String: Any] {
         ["id": id, "identifier": "EWA-\(created.count + 1)", "title": title, "description": "Fixture requirements",
          "priority": 0, "url": "https://linear.app/kmsh-dev/issue/EWA-\(created.count + 1)",
@@ -216,4 +239,80 @@ private func serviceRequire(_ condition: Bool, _ message: String) throws {
 
 private func serviceFailure(_ message: String) -> NSError {
     NSError(domain: "ServiceConnectionChecks", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
+}
+
+@MainActor
+private func checkPublicationStopsOnPlanChange(in directory: URL) async throws {
+    // Exercise success, lost-response recovery, and a UUID already holding older remote content.
+    for (loseResponse, olderRemoteContent) in [(false, false), (true, false), (true, true)] {
+        let journal = ServiceCheckJournal()
+        let transport = ServiceCheckTransport(journal: journal)
+        let connections = ServiceConnections(credentialStore: MemoryConnectionCredentials(journal: journal), transport: transport)
+        try serviceRequire(await connections.connectLinear(token: "fixture-linear"), "Race fixture connects")
+        let first = WorkTask(id: "first", title: "Original first assignment", owner: .interface,
+                             paths: ["Apps/First.swift"], acceptance: ["First behavior verified"],
+                             dependencies: [], handoff: "Share first result")
+        let second = WorkTask(id: "second", title: "Original second assignment", owner: .quality,
+                              paths: ["Tests/Second.swift"], acceptance: ["Second behavior verified"],
+                              dependencies: [], handoff: "Share second result")
+        let replacement = WorkPlan(summary: "Revised assignments", tasks: [
+            WorkTask(id: "replacement", title: "Revised work", owner: .interface,
+                     paths: ["Apps/Revised.swift"], acceptance: ["Revised behavior verified"],
+                     dependencies: [], handoff: "Share revised result")
+        ])
+        var workspace = Workspace()
+        let outcomeID = try workspace.recordOutcome("Change assignments while publication is running")
+        try workspace.attach(WorkPlan(summary: "Original assignments", tasks: [first, second]), to: outcomeID)
+        let repository = WorkspaceRepository(url: directory.appendingPathComponent("publication-race-\(loseResponse)-\(olderRemoteContent).json"))
+        try await repository.save(workspace)
+        let store = StudioStore(repository: repository, usesOnDeviceModel: true,
+                                planner: { _, _ in PlanningResult(plan: replacement, questions: []) })
+        await store.load()
+        let captured = store.workspace.outcomes[0]
+        if olderRemoteContent {
+            let reserved = try await store.prepareIssuePublication(outcomeID: outcomeID, task: first)
+            transport.seedIssue(id: reserved.issueID.uuidString.lowercased(), title: "Earlier plan assignment",
+                                description: "Earlier requirements that were never updated")
+        }
+        transport.pauseNextCreateResponse = true
+        transport.loseNextCreateResponse = loseResponse
+        let publishing = Task { await connections.publishPlan(for: captured, store: store) }
+        defer { transport.resumeCreateResponse() }
+        try await waitForServiceCheck("Create request pauses") { transport.createResponseIsPaused }
+        try serviceRequire(store.send("Replace these assignments", to: outcomeID),
+                           "User can continue the conversation during publication")
+        try await waitForServiceCheck("New assignments replace the captured plan") {
+            store.workspace.outcomes[0].plan == replacement && !store.isPlanning
+        }
+        transport.resumeCreateResponse()
+        await publishing.value
+        try serviceRequire(transport.createAttempts == 1 && transport.updateAttempts == 0 && transport.created.count == 1,
+                           "Changed plan stops remaining creates and recovery updates")
+        let saved = try await repository.load()
+        let receipt = saved.issueBinding(outcomeID: outcomeID, taskID: first.id)
+        if olderRemoteContent {
+            try serviceRequire(receipt != nil && receipt?.identifier == nil && receipt?.publishedTask == nil,
+                               "Finding older content by reserved UUID does not claim the current snapshot was published")
+        } else {
+            try serviceRequire(receipt?.identifier == "EWA-1" && receipt?.publishedTask == first,
+                               "In-flight create receipt remains durable with its original sent task")
+        }
+        try serviceRequire(saved.issueBinding(outcomeID: outcomeID, taskID: second.id) == nil &&
+                           connections.publicationError == "Plan changed; review current assignments and publish again.",
+                           "Unsent old task stays unpublished and current assignments are requested")
+        let requestCount = transport.createAttempts + transport.updateAttempts
+        await connections.publishPlan(for: captured, store: store)
+        try serviceRequire(transport.createAttempts + transport.updateAttempts == requestCount,
+                           "A stale direct publish cannot send mutations")
+    }
+    print("Publication race checks passed: plan replacement stops stale tasks and recovery updates while retaining completed receipts.")
+}
+
+@MainActor
+private func waitForServiceCheck(_ message: String, condition: () -> Bool) async throws {
+    for _ in 0..<500 {
+        if condition() { return }
+        try await Task.sleep(for: .milliseconds(2))
+    }
+    throw serviceFailure("Timed out: \(message)")
 }
