@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: validate-${{ github.ref }}
+  group: validate-${{ github.ref }}-${{ inputs.capture_launch && 'launch' || 'build' }}
   cancel-in-progress: true
 
 jobs:
@@ -67,8 +67,11 @@ jobs:
         run: xcodebuild -project EngineeringStudio.xcodeproj -scheme EngineeringStudioMac -destination 'generic/platform=macOS' -derivedDataPath DerivedData -resultBundlePath Results/macOS.xcresult CODE_SIGNING_ALLOWED=NO build
       - name: Launch actual apps on macOS 27 and iOS 27
         if: success() && inputs.capture_launch == true
-        timeout-minutes: 8
-        run: swift Tools/NativeSmoke/Run.swift
+        timeout-minutes: 10
+        run: |
+          xcrun swiftc -swift-version 6 -o /tmp/engineering-studio-native-smoke Tools/NativeSmoke/*.swift
+          /tmp/engineering-studio-native-smoke --self-test
+          /tmp/engineering-studio-native-smoke
       - uses: actions/upload-artifact@v4
         if: always()
         with:
