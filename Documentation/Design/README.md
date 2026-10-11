@@ -1,6 +1,6 @@
 # Engineering Studio design direction
 
-The approved workspace concept is the visual reference for the native app:
+The approved workspace concept sets the native app’s composition. The [current SwiftUI review](SwiftUI-review.md) refines its surfaces using neutral-first design principles:
 
 ![Approved workspace concept](approved-workspace-concept.png)
 
@@ -10,24 +10,24 @@ This image is a design concept with example data, not a running application.
 
 - Use three native resizable panes on Mac (`HSplitView`): outcomes, conversation/tasks, selected task details. This allows the sidebar and detail panel to be inset beneath the unified toolbar as in the reference. Use `NavigationSplitView` on iOS to adapt the same selections to compact navigation.
 - Let the content background continue beneath the native unified toolbar. Place controls in the system's rounded toolbar groups; avoid a separate, contrasting header panel.
-- Keep task inspection in the third column. Use native sheets for bounded flows such as creating an outcome or editing settings.
+- Keep task inspection in the third column. Use native sheets for bounded flows such as creating an outcome. Mac preferences use a native Settings scene; iOS settings use a sheet.
 - Preserve a persistent composer for the selected outcome. Follow-up messages belong to that outcome and inform its next plan.
 
 ## Materials and actions
 
-- Use standard materials for content structure and Liquid Glass for interactive surfaces such as the composer and primary actions.
+- Use standard materials for content structure and Liquid Glass for interactive surfaces such as primary actions. The composer uses regular standard material so its glass Send button is not nested inside glass.
 - Choose materials for their semantic role. Let the system respond to window activity, wallpaper, Increase Contrast and Reduce Transparency; do not bake the concept's apparent glass color into images.
 - Use blue for Send, green for Run/Prepare, and amber for Pause/Cancel. Keep labels and SF Symbols so color is supplementary.
 - Keep typography native, content selectable, column sizes flexible and secondary text legible. Use system controls and keyboard commands.
 - Use only SF Symbols for workspace icons (`Image(systemName:)` and `Label(systemImage:)`), including task and coordinator badges. Do not copy the concept's GitHub logo or fictitious portrait.
-- Match the reference's scale: 16-point conversation/sidebar text, 14-point metadata, 48-point conversation badges, a 62-point task badge, and approximately 44–50-point primary controls. Maintain separate Task, Owner and Status columns at Mac widths.
+- Preserve the reference's hierarchy with shared system typography roles, 48-point conversation badges, a 62-point task badge, and approximately 44–50-point primary content controls. Task, Owner and Status use separate columns when space permits and stacked metadata in compact/accessibility layouts.
 
 ## Apple implementation references
 
 Reviewed through Firecrawl on 2026-10-10 alongside the SwiftUI Expert, Liquid Glass and UI Patterns skills:
 
 - [Applying Liquid Glass to custom views](https://developer.apple.com/documentation/swiftui/applying-liquid-glass-to-custom-views): apply the glass effect after layout and use native glass button styles for interactive controls.
-- [Materials](https://developer.apple.com/design/human-interface-guidelines/materials): standard materials establish content structure beneath glass. Material role and accessibility behavior are separate from the workspace's decorative blue backdrop.
+- [Materials](https://developer.apple.com/design/human-interface-guidelines/materials): standard materials establish content structure beneath glass. Material role and accessibility behavior guide the system appearance; no decorative blue backdrop is required.
 - [HSplitView](https://developer.apple.com/documentation/swiftui/hsplitview): native Mac panes with draggable dividers.
 - [NavigationSplitView](https://developer.apple.com/documentation/swiftui/navigationsplitview): selection-driven columns and compact navigation.
 - [Image(systemName:)](https://developer.apple.com/documentation/swiftui/image/init(systemname:)): system-provided SF Symbol images.
