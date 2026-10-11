@@ -29,3 +29,22 @@ The `swift-app` branch contains the native engineering app and the FoundationMod
 - Installed skills and the Interfaces plugin are aids, not a new authority. User directions and this repository's Swift-only requirements take precedence over generic web examples, questionnaire gates and default publishing or issue-reporting behavior. Never execute installation-time hooks or public reporting automatically.
 - Prefer an existing answer and a reasonable implementation choice to another question. If information is genuinely blocking, batch related questions using available in-chat controls and wait for answers before dependent work; continue independent work meanwhile. Do not use an inaccessible HTML artifact to collect answers.
 - Use `strategy/runbooks.json` to select a workflow. Keep progress grounded in commits, actual commands, native captures and service receipts. Distinguish build success, app launch and complete product behavior.
+
+## Leverage skills
+
+Use the available swift/swiftui plugins and skills for stronger SwiftUI conventions baked into the app:
+
+- Use swiftui specialsit skill for Authoritative SwiftUI best practices and performance guidance from Apple and always adopt what's new in swiftui SDK 27.
+- Foundation model skills for working with LLMs via the [Foundation Models framework](https://developer.apple.com/documentation/FoundationModels), such as custom skills, context management helpers, and a chat completions client that connects to a hosted model of your choice.
+
+- SwiftUI Pro is a broad SwiftUI review skill for modern APIs, maintainability, accessibility, and performance.
+
+- Liquid Glass expert helps adopt the new iOS 26 Liquid Glass APIs and tune custom components so they fit the latest system design.
+
+- SwiftUI performance helps when a feature feels slow or a SwiftUI view update path looks suspicious. It scans for common SwiftUI mistakes and produces a prioritized report of what to fix and where the biggest gains are.
+
+- Swift concurrency expert helps when cryptic errors and compiler warnings start fighting the change you want to make. 
+
+SwiftUI view refactor helps keep files smaller and make SwiftUI code more consistent across the repo.
+
+SwiftUI patterns helps reach for predictable @Observable and @Environment architecture patterns as the app grows.
