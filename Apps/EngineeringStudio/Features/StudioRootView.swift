@@ -229,8 +229,8 @@ struct StudioRootView: View {
                     HStack(spacing: 14) {
                         Image(systemName: "person.2").font(.system(size: 22)).frame(width: 26)
                         VStack(alignment: .leading, spacing: 7) {
-                            Text("Developers")
-                            Label("0 connected", systemImage: "circle").font(StudioTypography.caption).foregroundStyle(.secondary)
+                            Text("Developers").fixedSize(horizontal: true, vertical: false)
+                            Label("0 connected", systemImage: "circle").font(StudioTypography.caption).foregroundStyle(.secondary).lineLimit(1)
                         }
                         Spacer(minLength: 0)
                         Text(Specialty.allCases.count, format: .number).foregroundStyle(.secondary)

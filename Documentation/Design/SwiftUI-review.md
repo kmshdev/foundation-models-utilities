@@ -1,6 +1,6 @@
 # SwiftUI and product review — 2026-10-11
 
-Status: UI and state improvements implemented; production acceptance remains blocked.
+Status: UI/state improvements and full SDK 27 builds are complete. Connected-service and end-to-end product acceptance remain outstanding. See [toolchain evidence](../Engineering/Toolchain.md).
 
 ## Product and information architecture
 
@@ -28,7 +28,7 @@ The reference establishes composition and hierarchy. The current refinement appl
 | --- | --- |
 | Invalidation and Observation | Composer text formerly lived on the entire conversation view. Each outcome now owns an independently observed `OutcomeDraft`; typing no longer reads or writes the workspace history. The composer is a separate view. Filtering the growing workspace still needs Instruments measurement with realistic history before further caching/pagination work. |
 | State ownership | Store owns workspace and per-outcome session drafts; views own ephemeral selection, disclosures and presentation. Drafts survive switching outcomes. Sending clears only a successfully accepted draft. Failed load can retry. Current-revision save conflicts now surface rather than silently disappearing. |
-| Modern APIs | `@Observable`, `@Bindable` at the editable leaf, `.task`, two-value `onChange`, `NavigationStack`, `NavigationSplitView`, Settings, native glass button styles, SF Symbols and selectable text. Full SDK 27 compilation is still required, including its evolved `@State` initialization behavior. Existing compatibility initializers are not claimed to have been checked with that compiler. |
+| Modern APIs | `@Observable`, `@Bindable` at the editable leaf, `.task`, two-value `onChange`, `NavigationStack`, `NavigationSplitView`, Settings, native glass button styles, SF Symbols and selectable text. Both production targets now compile with Xcode 27 and Swift 6.4, including the current state initializers. |
 | Composition | Removed unused duplicate work-list and plan-detail screens. Extracted `OutcomeComposer` and `TaskSummaryView`; stable task IDs drive rows. View helpers remain for small repeated sections rather than extracting every modifier. |
 | Layout and large screens | Three pane widths are bounded to a usable Mac minimum. A smaller Mac conversation falls back to stacked task metadata. Accessibility text sizes force stacked rows and composer controls. iOS uses the native compact-column navigation path. Device/foldable behavior is not established by Mac screenshots. |
 | Sheets and navigation | Identifiable sheet state prevents competing presentation flags. Mac Settings is a scene. New Outcome owns unsaved form text and dismisses only after successful submission. Task inspection remains inline. |
@@ -44,10 +44,10 @@ The reference establishes composition and hierarchy. The current refinement appl
 
 Before a production claim:
 
-1. Build complete app targets with Swift 6.4 and iOS/macOS 27 SDKs, including the actual Foundation Models service and local utilities package; sign and run those builds.
+1. Complete signing/distribution and native interaction coverage. Both full SDK 27 targets, including the actual model service and utilities package, now build.
 2. Complete a documented, supported personal ChatGPT subscription transport; GitHub/Linear authentication and scope enforcement; connected Swift developer execution and heartbeats; verified handoffs, tests and pull requests. These are unfinished product integrations, not UI polish.
 3. Validate VoiceOver, keyboard traversal, sheets, live divider resizing, compact iPhone navigation and accessibility text sizes on native targets. Static screenshots cannot prove these behaviors.
-4. Make unsent drafts durable across app relaunch and verify pending-write/quit behavior. This change guarantees session retention, not crash-safe draft persistence.
+4. Exercise lifecycle behavior on devices. Draft relaunch persistence, ordered writes, atomic send/clear and failed-save retry are implemented and regression-tested. Normal Mac quit waits for flush; force termination before a debounced write can still lose the most recent keystrokes.
 5. Measure large histories with Instruments, establish UI integration coverage and verify release signing/distribution. No runtime performance improvement is quantified without profiling.
 
 ## Sources and skills

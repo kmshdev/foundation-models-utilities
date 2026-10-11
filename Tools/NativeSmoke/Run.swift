@@ -4,6 +4,7 @@ import Foundation
 
 @discardableResult
 func run(_ executable: String, _ arguments: [String], capture: Bool = false) throws -> Data {
+    FileHandle.standardOutput.write(Data("Running: \(executable) \(arguments.joined(separator: " "))\n".utf8))
     let process = Process()
     process.executableURL = URL(fileURLWithPath: executable)
     process.arguments = arguments

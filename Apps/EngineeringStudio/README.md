@@ -2,7 +2,7 @@
 
 A native SwiftUI workspace for a personal engineering coordinator and eight specialist developers. Swift 6.4, iOS 27, and macOS 27.
 
-**Status: native app source and tested coordination core; not yet a connected, deployable bot team.** The Apple-platform build must pass before this is treated as a runnable app. There is no TestFlight or signed Mac build yet.
+**Status: both native app targets build with Xcode 27 and Swift 6.4; not yet a connected, deployable bot team.** [Toolchain evidence](../../Documentation/Engineering/Toolchain.md). There is no TestFlight or signed/notarized distribution build yet.
 
 ## Open the app
 
@@ -16,7 +16,7 @@ The accepted design uses three native panes: outcomes, the selected outcome's co
 
 The window follows system light/dark appearance, with a continuous neutral background, semantic standard materials for content and composer, the native unified toolbar, and Liquid Glass for actions. Blue identifies Send, green identifies planning/run actions, and amber identifies cancellation/pause intent. Symbols and labels carry meaning alongside color. Execution and verification actions remain disabled with explanations until their services exist; a planned task never claims to be running or tested.
 
-Unsent composer drafts survive outcome switches during the app session; they are not yet persisted across relaunch. Messages sent from an outcome are attached to that outcome and supplied as context when preparing its next plan. Legacy messages without an outcome ID remain accessible under All Outcomes, without guessing which thread they belong to. Search finds outcomes. Task selection is cleared when its outcome changes or a replacement plan removes that task.
+Unsent composer drafts are saved after a short typing pause and restored across relaunch. Message acceptance and draft clearing share one atomic disk snapshot. Pending writes flush on scene inactivity; normal Mac quit waits for a successful flush and leaves the app open if saving fails. Force termination can still interrupt a pending debounce. Messages sent from an outcome are attached to that outcome and supplied as context when preparing its next plan. Legacy messages without an outcome ID remain accessible under All Outcomes, without guessing which thread they belong to. Search finds outcomes. Task selection is cleared when its outcome changes or a replacement plan removes that task.
 
 The Swift-only preview host in `Tools/SwiftUIPreview` compiles the real views and store using a disabled model service. Its screenshots are native UI with fixture data, not evidence of live bot execution. It also typechecks shared UI and both app scene branches against the installed Apple SDKs and runs StudioStore state regression checks; production SDK 27 validation is separate. See the [SwiftUI review](../../Documentation/Design/SwiftUI-review.md) for coverage and release blockers.
 

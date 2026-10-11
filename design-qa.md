@@ -1,6 +1,6 @@
 # Native workspace QA — SwiftUI review
 
-**Final result: blocked for production acceptance.** Source review and native preview checks are complete. Full SDK 27 app, native interaction and service validation remain outstanding.
+**Final result: blocked for production acceptance.** Source review and native preview checks are complete. Full SDK 27 builds now pass; native interaction and service acceptance remain outstanding. See [toolchain evidence](Documentation/Engineering/Toolchain.md).
 
 The reference supplies the three-pane composition, continuous window, floating controls and SF Symbol scale. This refinement uses neutral system appearance, standard content materials and functional accent color. It does not claim pixel-identical reproduction of the generated blue/glowing illustration. [Review and design rules](Documentation/Design/SwiftUI-review.md) record all requested SwiftUI topics and the product architecture.
 
@@ -21,13 +21,13 @@ Observed after refinement:
 
 The native preview host executes state regression checks against the real `StudioStore`: per-outcome draft identity and isolation, retained edits, successful-send clearing, rejected-send retention, correct message ownership, disk saving and retry after a corrupt-file load. The existing Swift 6.4 core suite has 12 tests covering coordination and persistence.
 
-Both app scene branches and shared views are typechecked with the installed SDK 26 toolchain. The screenshot host replaces FoundationPlanner with a disabled service. This is deliberately separate from the complete Swift 6.4 / SDK 27 app build, which fails the toolchain availability check on the current runner.
+Both app scene branches and shared views are typechecked with the installed SDK 26 toolchain. The screenshot host replaces FoundationPlanner with a disabled service. This is deliberately separate from the complete Swift 6.4 / SDK 27 app build, which now succeeds on the documented `xcode-27` runner.
 
 ## Remaining acceptance work
 
-- SDK 27 build and target-device runs, including the actual model service and package integration.
+- Target-device interaction and model execution checks; the full SDK 27 targets and actual model service now compile.
 - Supported personal ChatGPT model transport, GitHub/Linear authentication and synchronization, developer execution and verified test/PR handoffs.
 - Keyboard traversal, VoiceOver, live divider resizing, sheets, iPhone compact navigation, accessibility text sizes and Reduce Transparency on native targets.
-- Draft persistence across relaunch, pending-write/quit behavior, large-history profiling, signing and distribution.
+- Native lifecycle interaction, large-history profiling, signing and distribution. Draft persistence, ordered writes and atomic send/clear now have regression coverage; Mac quit waits for its pending flush.
 
 No screenshot or passing portable test is presented as proof of these missing capabilities. The [earlier reference-correction history](Documentation/Design/reference-correction-history.md) is retained separately.
