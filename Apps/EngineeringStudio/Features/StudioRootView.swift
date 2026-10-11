@@ -5,12 +5,13 @@ private enum WorkspaceDestination: Hashable {
     case all, needsInput, outcome(UUID)
 }
 private enum StudioSheet: String, Identifiable {
-    case newOutcome, team, settings
+    case newOutcome, team, settings, connections
     var id: Self { self }
 }
 
 struct StudioRootView: View {
     let store: StudioStore
+    let connections: ServiceConnections
     #if os(macOS)
     @Environment(\.openSettings) private var openSettings
     #endif
@@ -23,8 +24,10 @@ struct StudioRootView: View {
     @State private var search = ""
 
     /// One-time selection seeds for self-contained SwiftUI previews.
-    init(store: StudioStore, initialOutcomeID: UUID? = nil, initialTaskID: String? = nil, initialDraft: String = "") {
+    init(store: StudioStore, connections: ServiceConnections = ServiceConnections(),
+         initialOutcomeID: UUID? = nil, initialTaskID: String? = nil, initialDraft: String = "") {
         self.store = store
+        self.connections = connections
         self.initialDraft = initialDraft
         _destination = State(initialValue: initialOutcomeID.map(WorkspaceDestination.outcome) ?? .all)
         _selectedTaskID = State(initialValue: initialTaskID)
@@ -108,6 +111,7 @@ struct StudioRootView: View {
                         .help(store.isPlanning ? "Cancel planning" : "Developer execution is not connected yet")
                         Menu {
                             Button("Developers", systemImage: "person.2") { sheet = .team }
+                            Button("Connections", systemImage: "link") { sheet = .connections }
                             Button("Settings", systemImage: "gearshape") { openSettings() }
                         } label: {
                             Image(systemName: "ellipsis").font(.system(size: 18)).frame(width: 40, height: 40)
@@ -125,6 +129,7 @@ struct StudioRootView: View {
             ToolbarItem(placement: .primaryAction) {
                 Menu("More", systemImage: "ellipsis") {
                     Button("Developers", systemImage: "person.2") { sheet = .team }
+                    Button("Connections", systemImage: "link") { sheet = .connections }
                     Button("Settings", systemImage: "gearshape") { sheet = .settings }
                     if store.isPlanning {
                         Button("Cancel Planning", systemImage: "stop.fill") { store.cancelPlanning() }
@@ -139,7 +144,7 @@ struct StudioRootView: View {
         .searchable(text: $search, prompt: "Search outcomes")
         #endif
         .sheet(item: $sheet) { item in
-            StudioSheetView(kind: item, store: store)
+            StudioSheetView(kind: item, store: store, connections: connections)
         }
         .onChange(of: destination) { _, _ in selectedTaskID = nil }
         .onChange(of: search) { _, query in
@@ -194,8 +199,8 @@ struct StudioRootView: View {
                     Button("Retry") { Task { await store.load() } }
                 }
             } else if let outcome {
-                EngineeringRoomView(store: store, outcome: outcome, selectedTaskID: selectedTaskID,
-                                    initialDraft: initialDraft) { taskID in
+                EngineeringRoomView(store: store, connections: connections, outcome: outcome, selectedTaskID: selectedTaskID,
+                                    initialDraft: initialDraft, openConnections: { sheet = .connections }) { taskID in
                     selectedTaskID = taskID
                     // A repeated selection must reopen the detail after Back,
                     // even when the highlighted task ID hasn't changed.
@@ -209,7 +214,9 @@ struct StudioRootView: View {
 
     private var detailColumn: some View {
         Group {
-            if let selectedTask { TaskDetailView(task: selectedTask) }
+            if let selectedTask, let outcome {
+                TaskDetailView(task: selectedTask, issueBinding: store.issueBinding(outcomeID: outcome.id, taskID: selectedTask.id))
+            }
             else {
                 ContentUnavailableView("Select a task", systemImage: "sidebar.right",
                                        description: Text("Its scope, requirements and handoff appear here."))
@@ -325,6 +332,7 @@ struct StudioRootView: View {
 private struct StudioSheetView: View {
     let kind: StudioSheet
     let store: StudioStore
+    let connections: ServiceConnections
     @Environment(\.dismiss) private var dismiss
     var body: some View {
         NavigationStack {
@@ -332,7 +340,8 @@ private struct StudioSheetView: View {
                 switch kind {
                 case .newOutcome: NewOutcomeView(store: store)
                 case .team: TeamView()
-                case .settings: StudioSettingsView(store: store)
+                case .settings: StudioSettingsView(store: store, connections: connections)
+                case .connections: ServiceConnectionsView(connections: connections, store: store)
                 }
             }
             .toolbar {

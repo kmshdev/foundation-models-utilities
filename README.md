@@ -4,7 +4,7 @@ Native SwiftUI engineering workspace for **iOS 27 and macOS 27**, implemented in
 
 Open [`EngineeringStudio.xcodeproj`](EngineeringStudio.xcodeproj) and select `EngineeringStudioiOS` or `EngineeringStudioMac`. App source is in [`Apps/EngineeringStudio`](Apps/EngineeringStudio); the portable coordination package and its tests are in [`Packages/EngineeringCore`](Packages/EngineeringCore). Both app targets use the root utilities package locally.
 
-**Current status:** app source and tested coordination core. Native compilation and UI behavior remain unverified; ChatGPT subscription authentication, connected developer execution, and GitHub/Linear synchronization are unfinished. This is not an installable release.
+**Current status:** both native targets build on Xcode 27 / Swift 6.4. The app includes on-device planning, durable conversations, GitHub repository activity, and scoped Linear intake/task publication. Personal ChatGPT sign-in and connected developer execution remain unfinished. This is not a signed distribution release. See the [current evidence](strategy/current-state.md).
 
 See the [app guide](Apps/EngineeringStudio/README.md) for setup, validation and remaining work. All implementation code must remain Swift; the repository [agent instructions](AGENTS.md) record that requirement.
 

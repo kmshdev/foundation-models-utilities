@@ -20,6 +20,7 @@ private final class CaptureDelegate: NSObject, NSApplicationDelegate {
         Task {
             do {
                 try await checkStudioStore()
+                try await checkServiceConnections()
                 let output = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
                 try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
                 var workspace = Workspace()

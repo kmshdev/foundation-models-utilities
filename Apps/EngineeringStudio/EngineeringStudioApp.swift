@@ -6,6 +6,7 @@ import AppKit
 @main
 struct EngineeringStudioApp: App {
     @State private var store = StudioStore()
+    @State private var connections = ServiceConnections()
     @Environment(\.scenePhase) private var scenePhase
     #if os(macOS)
     @NSApplicationDelegateAdaptor(StudioAppDelegate.self) private var appDelegate
@@ -13,12 +14,13 @@ struct EngineeringStudioApp: App {
 
     var body: some Scene {
         WindowGroup {
-            StudioRootView(store: store)
+            StudioRootView(store: store, connections: connections)
                 .task {
                     #if os(macOS)
                     appDelegate.store = store
                     #endif
                     await store.load()
+                    await connections.load()
                 }
                 .onChange(of: scenePhase) { _, phase in
                     if phase != .active { Task { await store.flushPendingChanges() } }
@@ -35,7 +37,9 @@ struct EngineeringStudioApp: App {
 
         #if os(macOS)
         Settings {
-            StudioSettingsView(store: store)
+            NavigationStack {
+                StudioSettingsView(store: store, connections: connections)
+            }
                 .frame(width: 560, height: 620)
         }
         #endif

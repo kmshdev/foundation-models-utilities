@@ -3,19 +3,23 @@ import SwiftUI
 
 struct EngineeringRoomView: View {
     let store: StudioStore
+    let connections: ServiceConnections
     let outcome: Outcome
     let selectedTaskID: String?
     let inspectTask: (String) -> Void
+    let openConnections: () -> Void
     private let initialDraft: String
     @State private var showsTasks = false
 
     /// One-time draft seed used only by self-contained previews.
-    init(store: StudioStore, outcome: Outcome, selectedTaskID: String?, initialDraft: String = "",
-         inspectTask: @escaping (String) -> Void) {
+    init(store: StudioStore, connections: ServiceConnections, outcome: Outcome, selectedTaskID: String?, initialDraft: String = "",
+         openConnections: @escaping () -> Void, inspectTask: @escaping (String) -> Void) {
         self.store = store
+        self.connections = connections
         self.outcome = outcome
         self.selectedTaskID = selectedTaskID
         self.inspectTask = inspectTask
+        self.openConnections = openConnections
         self.initialDraft = initialDraft
     }
 
@@ -32,6 +36,10 @@ struct EngineeringRoomView: View {
             .pickerStyle(.segmented).labelsHidden().controlSize(.large)
             .frame(maxWidth: 330).padding(.bottom, StudioSpacing.section)
             Divider()
+            if let source = outcome.source {
+                Link("Open source issue in Linear", destination: source.url)
+                    .font(.caption).padding(.top, 8)
+            }
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 24) {
@@ -53,6 +61,10 @@ struct EngineeringRoomView: View {
                             QuestionBatchView(batch: batch) { store.answer(batch, answers: $0) }
                         }
                         OutcomeSummary(outcome: outcome, store: store)
+                        if outcome.plan != nil {
+                            PlanPublishingControls(outcome: outcome, store: store, connections: connections,
+                                                   openConnections: openConnections)
+                        }
                         Color.clear.frame(height: 1).id("end")
                     }.padding(.horizontal, 10).padding(.top, 16).padding(.bottom, 12)
                 }
@@ -143,6 +155,7 @@ struct OutcomeSummary: View {
 
 struct TaskDetailView: View {
     let task: WorkTask
+    var issueBinding: TaskIssueBinding? = nil
     @State private var showsRequirements = false
     var body: some View {
         ScrollView {
@@ -156,6 +169,13 @@ struct TaskDetailView: View {
                     Spacer(minLength: 0)
                 }
                 Divider().opacity(0.6)
+                if let binding = issueBinding, let url = binding.webURL {
+                    Link(binding.identifier ?? "Open Linear issue", destination: url)
+                    if binding.publishedTask != task {
+                        Text("This task has changed since its last publication.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
                 detailSection("Scope", symbol: "doc.text") {
                     ForEach(task.paths, id: \.self) { path in
                         Text(path)

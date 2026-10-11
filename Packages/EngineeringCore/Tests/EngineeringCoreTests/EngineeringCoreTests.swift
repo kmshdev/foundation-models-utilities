@@ -40,9 +40,74 @@ private func task(_ id: String, path: String, dependencies: [String] = []) -> Wo
     let data = try JSONEncoder().encode(workspace)
     var fields = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
     fields.removeValue(forKey: "drafts")
+    fields.removeValue(forKey: "issueBindings")
     let restored = try JSONDecoder().decode(Workspace.self, from: JSONSerialization.data(withJSONObject: fields))
     #expect(restored == workspace)
     #expect(restored.drafts.isEmpty)
+    #expect(restored.issueBindings.isEmpty)
+    #expect(restored.outcomes.first?.source == nil)
+}
+
+@Test func importedSourceIdentitySurvivesReloadAndPreventsDuplicates() throws {
+    var workspace = Workspace()
+    let issueID = UUID().uuidString
+    let source = OutcomeSource(kind: .linear, id: issueID, url: URL(string: "https://linear.app/team/issue/ENG-1")!)
+    _ = try workspace.recordOutcome("Imported engineering ticket", source: source)
+    var restored = try JSONDecoder().decode(Workspace.self, from: JSONEncoder().encode(workspace))
+    #expect(restored.outcomes.first?.source == source)
+    let duplicate = OutcomeSource(kind: .linear, id: issueID.lowercased(), url: source.url)
+    #expect(throws: WorkspaceError.duplicateSource) {
+        try restored.recordOutcome("Renamed title does not create a duplicate", source: duplicate)
+    }
+    #expect(restored == workspace)
+    _ = try restored.recordOutcome("Unrelated local outcome with the same title")
+    #expect(restored.outcomes.count == 2)
+}
+
+@Test func issueReservationsAreStableAndScopedToOutcomeAndTask() throws {
+    var workspace = Workspace()
+    let first = try workspace.recordOutcome("First publication")
+    let second = try workspace.recordOutcome("Second publication")
+    let reserved = try workspace.reserveIssuePublication(outcomeID: first, taskID: "interface")
+    let repeated = try workspace.reserveIssuePublication(outcomeID: first, taskID: "interface")
+    let separate = try workspace.reserveIssuePublication(outcomeID: second, taskID: "interface")
+    #expect(reserved == repeated)
+    #expect(reserved.id != separate.id && reserved.issueID != separate.issueID)
+    #expect(reserved.identifier == nil && reserved.webURL == nil && reserved.publishedTask == nil)
+    let unchanged = workspace
+    #expect(throws: WorkspaceError.missingOutcome) {
+        try workspace.reserveIssuePublication(outcomeID: UUID(), taskID: "interface")
+    }
+    #expect(workspace == unchanged)
+    let restored = try JSONDecoder().decode(Workspace.self, from: JSONEncoder().encode(workspace))
+    #expect(restored.issueBinding(outcomeID: first, taskID: "interface") == reserved)
+}
+
+@Test func receiptsMustMatchReservationAndRetainThePublishedSnapshot() throws {
+    var workspace = Workspace()
+    let outcome = try workspace.recordOutcome("Publish tasks")
+    let sent = task("interface", path: "Apps/Original.swift")
+    let revised = task("interface", path: "Apps/Revised.swift")
+    let receiptURL = URL(string: "https://linear.app/team/issue/ENG-2")!
+    #expect(throws: WorkspaceError.missingIssueBinding) {
+        try workspace.recordIssuePublication(outcomeID: outcome, task: sent, issueID: UUID(),
+                                             identifier: "ENG-2", webURL: receiptURL)
+    }
+    let reserved = try workspace.reserveIssuePublication(outcomeID: outcome, taskID: sent.id)
+    try workspace.attach(WorkPlan(summary: "Revised while publishing", tasks: [revised]), to: outcome)
+    let unchanged = workspace
+    #expect(throws: WorkspaceError.issueReceiptMismatch) {
+        try workspace.recordIssuePublication(outcomeID: outcome, task: sent, issueID: UUID(),
+                                             identifier: "ENG-2", webURL: receiptURL)
+    }
+    #expect(workspace == unchanged)
+    try workspace.recordIssuePublication(outcomeID: outcome, task: sent, issueID: reserved.issueID,
+                                         identifier: "ENG-2", webURL: receiptURL)
+    let restored = try JSONDecoder().decode(Workspace.self, from: JSONEncoder().encode(workspace))
+    let binding = try #require(restored.issueBinding(outcomeID: outcome, taskID: sent.id))
+    #expect(binding.publishedTask == sent)
+    #expect(binding.identifier == "ENG-2" && binding.webURL == receiptURL)
+    #expect(restored.outcomes.first?.plan?.tasks == [revised])
 }
 
 @Test func draftAndMessageCommitTogether() async throws {

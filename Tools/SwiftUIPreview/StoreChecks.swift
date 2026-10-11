@@ -87,7 +87,98 @@ func checkStudioStore() async throws {
     try require(recoveringStore.isLoaded && recoveringStore.workspace == workspace,
                 "Failed loads can be retried after repair")
     try await checkAutomaticPlanning(in: directory)
+    try await checkLinearIntakeAndPublication(in: directory)
     print("StudioStore regression checks passed: draft isolation, relaunch, atomic send, write ordering, failed-write retention, retry and load recovery.")
+}
+
+@MainActor
+private func checkLinearIntakeAndPublication(in directory: URL) async throws {
+    let url = directory.appendingPathComponent("linear-intake.json")
+    let repository = WorkspaceRepository(url: url)
+    let provider = ControlledPlanner()
+    let store = StudioStore(repository: repository, usesOnDeviceModel: true, planner: provider.call)
+    await store.load()
+    let sourceIssue = try linearIssue(id: UUID(), identifier: "ENG-1", title: "Build the native engineering room")
+    try require(store.importIssue(sourceIssue), "Linear issue intake creates an outcome")
+    try require(!store.importIssue(sourceIssue) && store.workspace.outcomes.count == 1,
+                "Repeated imports do not create outcomes or messages")
+    try await waitFor("Imported issue starts planning") { provider.calls.count == 1 }
+    try require(provider.calls[0].outcome.contains(sourceIssue.identifier) &&
+                provider.calls[0].outcome.contains("Imported requirements"), "Imported issue content reaches the planner")
+    provider.finish(with: planResult("Imported issue plan"))
+    try await waitFor("Imported plan completes") { !store.isPlanning }
+    try require(await store.flushPendingChanges(), "Imported source and plan reach disk")
+    let reloaded = StudioStore(repository: repository)
+    await reloaded.load()
+    try require(reloaded.hasImportedIssue(id: sourceIssue.id.lowercased()) && !reloaded.importIssue(sourceIssue),
+                "Durable source identity prevents duplicate imports after relaunch")
+    let outcome = reloaded.workspace.outcomes[0]
+    guard let task = outcome.plan?.tasks.first else {
+        throw NSError(domain: "StudioStoreChecks", code: 1,
+                      userInfo: [NSLocalizedDescriptionKey: "Imported plan has no task"])
+    }
+    let savedBeforeReservation = try Data(contentsOf: url)
+    try FileManager.default.removeItem(at: url)
+    try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+    var networkMayProceed = false
+    do {
+        _ = try await reloaded.prepareIssuePublication(outcomeID: outcome.id, task: task)
+        networkMayProceed = true
+    } catch WorkspaceError.publicationNotSaved { }
+    try require(!networkMayProceed, "Failed reservation persistence prevents proceeding to a network mutation")
+    guard let retained = reloaded.issueBinding(outcomeID: outcome.id, taskID: task.id) else {
+        throw NSError(domain: "StudioStoreChecks", code: 1,
+                      userInfo: [NSLocalizedDescriptionKey: "Failed write lost its in-memory reservation"])
+    }
+    try require(retained.identifier == nil && retained.publishedTask == nil,
+                "A reservation never claims a published issue")
+    try FileManager.default.removeItem(at: url)
+    try savedBeforeReservation.write(to: url, options: .atomic)
+    let reserved = try await reloaded.prepareIssuePublication(outcomeID: outcome.id, task: task)
+    try require(reserved.issueID == retained.issueID, "Retry retains the UUID allocated before the write failure")
+    let diskReservation = try await repository.load().issueBinding(outcomeID: outcome.id, taskID: task.id)
+    try require(diskReservation == reserved, "Publication permission follows a durable reservation")
+
+    let resumed = StudioStore(repository: repository)
+    await resumed.load()
+    let sameReservation = try await resumed.prepareIssuePublication(outcomeID: outcome.id, task: task)
+    try require(sameReservation.issueID == reserved.issueID,
+                "A retry after app relaunch reconciles the same reserved issue UUID")
+    let receipt = try linearIssue(id: reserved.issueID, identifier: "ENG-2", title: task.title)
+    let beforeReceipt = try Data(contentsOf: url)
+    try FileManager.default.removeItem(at: url)
+    try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+    do {
+        try await resumed.recordIssuePublication(outcomeID: outcome.id, task: task, issue: receipt)
+        try require(false, "Failed receipt persistence must throw")
+    } catch WorkspaceError.publicationNotSaved { }
+    try require(resumed.issueBinding(outcomeID: outcome.id, taskID: task.id)?.publishedTask == task,
+                "Failed receipt persistence retains exact sent task in memory")
+    try FileManager.default.removeItem(at: url)
+    try beforeReceipt.write(to: url, options: .atomic)
+    try await resumed.recordIssuePublication(outcomeID: outcome.id, task: task, issue: receipt)
+    let receiptOnDisk = try await repository.load().issueBinding(outcomeID: outcome.id, taskID: task.id)
+    try require(receiptOnDisk?.issueID == reserved.issueID && receiptOnDisk?.identifier == receipt.identifier &&
+                receiptOnDisk?.webURL == receipt.webURL && receiptOnDisk?.publishedTask == task,
+                "Receipt identity, URL and exact published snapshot survive disk reload")
+    let unknownOutcome = UUID()
+    do {
+        _ = try await resumed.prepareIssuePublication(outcomeID: unknownOutcome, task: task)
+        try require(false, "Unknown outcomes cannot reserve publication IDs")
+    } catch WorkspaceError.missingOutcome { }
+    try require(resumed.issueBinding(outcomeID: unknownOutcome, taskID: task.id) == nil,
+                "Invalid scope never creates a ledger entry")
+    print("Linear intake/publication checks passed: durable import deduplication, planning, saved reservation gate, stable UUID retry and receipt recovery.")
+}
+
+private func linearIssue(id: UUID, identifier: String, title: String) throws -> LinearIssue {
+    let fields: [String: Any] = [
+        "id": id.uuidString, "identifier": identifier, "title": title,
+        "description": "Imported requirements", "priority": 2,
+        "state": ["name": "Todo", "type": "unstarted"],
+        "url": "https://linear.app/engineering/issue/\(identifier)"
+    ]
+    return try JSONDecoder().decode(LinearIssue.self, from: JSONSerialization.data(withJSONObject: fields))
 }
 
 @MainActor

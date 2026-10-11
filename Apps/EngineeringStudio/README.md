@@ -26,6 +26,14 @@ With on-device planning enabled, sending a follow-up automatically queues an upd
 
 Plan details show ownership, file scopes, acceptance criteria, dependencies, and required handoff context. A saved plan is not a dispatched task, passed test, or created pull request.
 
+## GitHub and Linear
+
+Open Connections from the workspace menu or Settings. The configured public GitHub repository loads without a token, including open pull requests and recent workflow runs with commit links. Optional account credentials and the Linear personal key are entered in native secure fields and saved in this device's Keychain after scope verification; they never enter workspace JSON.
+
+Linear is scoped to Engineering Workflow Automation. Use an issue as an outcome to preserve its source link and start the normal planning flow. Imports remain deduplicated after relaunch. Publish a visible plan to create one Linear issue per task, including specialty, file scope, acceptance criteria, dependencies and handoff. The app saves a reserved issue UUID before sending; retries recover the same issue and retain confirmed receipts. Re-publishing updates those issues. A Linear ticket is not proof that a developer has started executing it.
+
+See [service behavior and failure handling](../../Documentation/Engineering/Service-integrations.md). Connections in this chat do not transfer account tokens into a separately installed app.
+
 ## Repository structure
 
 ```
@@ -63,9 +71,9 @@ The core tests cover Apple-style path collisions, unsafe paths, overlapping scop
 ## Remaining product work
 
 - Supported personal ChatGPT subscription sign-in and model transport. The app has no fabricated login flow, no API-key substitute for a subscription, and no Mac-runner authentication requirement.
-- GitHub and Linear authentication, scope enforcement, repository/project discovery, synchronization and deep links to actual work.
+- Task execution integration with GitHub checks and draft pull requests. The Swift clients exist; repository activity and Linear intake/publication are connected to the UI, but execution-specific receipts are not yet wired to developer runs.
 - Swift-based coordination and connected developer execution, with real heartbeats and durable task ownership. Research documented hosting options compatible with Swift before selecting cloud infrastructure.
 - Verified commit/artifact transfers, test evidence tied to acceptance criteria, pull requests, blockers and live progress.
 - Multimodal inputs, accessibility and layout validation on actual iOS/macOS, UI tests, signing and distribution.
 
-The eight roles and priority order preserve the requested setup: architecture/concurrency; Foundation Models; authentication/security; SwiftUI/accessibility; iOS/macOS; Cloudflare; testing/evaluation; CI/integration. Priority is explicit user order, urgent defects, dependency blockers, then Linear priority. Routine approval gates are not reintroduced. This initial app does not perform external actions.
+The eight roles and priority order preserve the requested setup: architecture/concurrency; Foundation Models; authentication/security; SwiftUI/accessibility; iOS/macOS; Cloudflare; testing/evaluation; CI/integration. Priority is explicit user order, urgent defects, dependency blockers, then Linear priority. Routine approval gates are not reintroduced. Publishing tasks explicitly writes to the configured Linear project; the app does not yet dispatch developer execution.

@@ -118,6 +118,43 @@ final class StudioStore {
         catch { failure = error.localizedDescription; return false }
     }
 
+    func hasImportedIssue(id: String) -> Bool {
+        workspace.outcomes.contains { $0.source?.matches(kind: .linear, id: id) == true }
+    }
+
+    @discardableResult func importIssue(_ issue: LinearIssue) -> Bool {
+        guard isLoaded, !hasImportedIssue(id: issue.id) else { return false }
+        let text = ["\(issue.identifier): \(issue.title)", issue.description]
+            .compactMap { $0 }.joined(separator: "\n\n")
+        do {
+            let id = try workspace.recordOutcome(text, source: OutcomeSource(kind: .linear, id: issue.id, url: issue.webURL))
+            persist()
+            enqueuePlanning(for: id)
+            return true
+        } catch { failure = error.localizedDescription; return false }
+    }
+
+    func issueBinding(outcomeID: UUID, taskID: String) -> TaskIssueBinding? {
+        workspace.issueBinding(outcomeID: outcomeID, taskID: taskID)
+    }
+
+    /// The caller must await this durable reservation before any network mutation.
+    /// Retrying returns the same issue ID, including after an ambiguous response.
+    func prepareIssuePublication(outcomeID: UUID, task: WorkTask) async throws -> TaskIssueBinding {
+        guard isLoaded else { throw WorkspaceError.workspaceNotLoaded }
+        let binding = try workspace.reserveIssuePublication(outcomeID: outcomeID, taskID: task.id)
+        guard await flushPendingChanges() else { throw WorkspaceError.publicationNotSaved }
+        return issueBinding(outcomeID: outcomeID, taskID: task.id) ?? binding
+    }
+
+    func recordIssuePublication(outcomeID: UUID, task: WorkTask, issue: LinearIssue) async throws {
+        guard isLoaded else { throw WorkspaceError.workspaceNotLoaded }
+        guard let issueID = UUID(uuidString: issue.id) else { throw WorkspaceError.issueReceiptMismatch }
+        try workspace.recordIssuePublication(outcomeID: outcomeID, task: task, issueID: issueID,
+                                             identifier: issue.identifier, webURL: issue.webURL)
+        guard await flushPendingChanges() else { throw WorkspaceError.publicationNotSaved }
+    }
+
     func plan(_ outcome: Outcome) {
         enqueuePlanning(for: outcome.id)
     }
