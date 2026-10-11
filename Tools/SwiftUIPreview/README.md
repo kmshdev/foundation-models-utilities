@@ -1,12 +1,12 @@
 # Native screenshot previews
 
-This Swift-only host compiles the app's actual view and store source on the available macOS 26 runner. It captures the real window with macOS `screencapture`, including composited AppKit controls that a view bitmap cache omits. It does not redraw the UI in HTML or generate an imagined image.
+This Swift-only host compiles the app's actual view and store source using Xcode 27 / Swift 6.4 on the `xcode-27` runner. It verifies both SDK versions before compiling. It captures the real window with macOS `screencapture`, including composited AppKit controls that a view bitmap cache omits. It does not redraw the UI in HTML or generate an imagined image.
 
 The SDK 27 Foundation Models service is excluded and replaced by a preview-only implementation that always throws if called. State is in-memory preview data. Every image is visibly labeled as a preview with services disabled. These captures do not establish that the full iOS/macOS 27 app builds or runs.
 
 Production targets, package manifests and deployment settings remain unchanged. Build products are disposable and ignored by Git. `BuildPreview.swift` compiles core sources directly for the preview host; it does not change the Swift 6.4 package manifest.
 
-On macOS 26 or later, from the repository root:
+On macOS 27 with Xcode 27 selected, from the repository root:
 
 ```
 swift Tools/SwiftUIPreview/BuildPreview.swift

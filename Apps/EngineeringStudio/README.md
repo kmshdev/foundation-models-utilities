@@ -22,6 +22,8 @@ The Swift-only preview host in `Tools/SwiftUIPreview` compiles the real views an
 
 You may explicitly enable optional on-device planning in Settings. It uses `LanguageModelSession.DynamicProfile`, the `LanguageModel` protocol, guided generation, typed error handling, and the utilities package's rolling history window. Model tool calling is disabled for this planning-only session. A generated plan is validated before it is saved. Any genuinely blocking questions appear together in the Engineering conversation; partial answers persist and planning waits for all answers in that batch.
 
+With on-device planning enabled, sending a follow-up automatically queues an updated plan. Work is serialized across outcomes; repeated follow-ups coalesce with the latest context, and outdated results are discarded. Other outcomes show when their planning is queued. Cancel Planning and disabling the model clear queued requests and prevent late results from publishing. Complete answers resume planning automatically; incomplete answers continue to block only their own outcome.
+
 Plan details show ownership, file scopes, acceptance criteria, dependencies, and required handoff context. A saved plan is not a dispatched task, passed test, or created pull request.
 
 ## Repository structure

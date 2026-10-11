@@ -46,6 +46,10 @@ struct StudioRootView: View {
             (search.isEmpty || $0.text.localizedStandardContains(search))
         }
     }
+    private var visibleLegacyMessages: [RoomMessage] {
+        guard destination == .all, search.isEmpty else { return [] }
+        return store.workspace.messages.filter { $0.outcomeID == nil }
+    }
 
     var body: some View {
         workspaceColumns
@@ -141,9 +145,6 @@ struct StudioRootView: View {
         .onChange(of: search) { _, query in
             if !query.isEmpty { destination = .all; compactColumn = .content }
         }
-        .onChange(of: selectedTaskID) { _, id in
-            if id != nil { compactColumn = .detail }
-        }
         .onChange(of: store.workspace.outcomes.last?.id) { _, id in
             if let id { destination = .outcome(id); compactColumn = .content }
         }
@@ -193,7 +194,13 @@ struct StudioRootView: View {
                     Button("Retry") { Task { await store.load() } }
                 }
             } else if let outcome {
-                EngineeringRoomView(store: store, outcome: outcome, selectedTaskID: $selectedTaskID, initialDraft: initialDraft)
+                EngineeringRoomView(store: store, outcome: outcome, selectedTaskID: selectedTaskID,
+                                    initialDraft: initialDraft) { taskID in
+                    selectedTaskID = taskID
+                    // A repeated selection must reopen the detail after Back,
+                    // even when the highlighted task ID hasn't changed.
+                    compactColumn = .detail
+                }
                     .id(outcome.id)
             } else { outcomeList }
         }
@@ -231,7 +238,7 @@ struct StudioRootView: View {
                         VStack(alignment: .leading, spacing: 7) {
                             Text("Developers").fixedSize(horizontal: true, vertical: false)
                             Label("0 connected", systemImage: "circle").font(StudioTypography.caption).foregroundStyle(.secondary).lineLimit(1)
-                        }
+                        }.layoutPriority(1)
                         Spacer(minLength: 0)
                         Text(Specialty.allCases.count, format: .number).foregroundStyle(.secondary)
                         Image(systemName: "chevron.right").font(StudioTypography.caption).foregroundStyle(.secondary)
@@ -291,18 +298,15 @@ struct StudioRootView: View {
                 }.buttonStyle(.plain)
             }
             // Keep pre-thread messages available without attributing them to an unrelated outcome.
-            if destination == .all, search.isEmpty {
-                let legacy = store.workspace.messages.filter { $0.outcomeID == nil }
-                if !legacy.isEmpty {
-                    Section("Earlier workspace conversation") {
-                        ForEach(legacy) { message in MessageRow(message: message) }
-                    }
+            if !visibleLegacyMessages.isEmpty {
+                Section("Earlier workspace conversation") {
+                    ForEach(visibleLegacyMessages) { message in MessageRow(message: message) }
                 }
             }
         }
         .scrollContentBackground(.hidden)
         .overlay {
-            if filteredOutcomes.isEmpty {
+            if filteredOutcomes.isEmpty && visibleLegacyMessages.isEmpty {
                 ContentUnavailableView {
                     Label(search.isEmpty ? "No outcomes here" : "No matching outcomes", systemImage: "bubble.left.and.bubble.right")
                 } description: {
@@ -360,6 +364,7 @@ private struct NewOutcomeView: View {
         }
         .formStyle(.grouped)
         .navigationTitle("New outcome")
+        .interactiveDismissDisabled(!text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
             ToolbarItem(placement: .confirmationAction) {

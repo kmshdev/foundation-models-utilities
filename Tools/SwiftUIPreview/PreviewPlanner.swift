@@ -1,5 +1,5 @@
 // Compiled only by the isolated screenshot host, never by either app target.
-// The host renders real screen source on the available macOS 26 runner without
+// The host renders real screen source on the SDK 27 runner without
 // linking the unavailable SDK 27 Foundation Models integration.
 import EngineeringCore
 import Foundation

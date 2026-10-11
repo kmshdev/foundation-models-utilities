@@ -4,15 +4,18 @@ import SwiftUI
 struct EngineeringRoomView: View {
     let store: StudioStore
     let outcome: Outcome
-    @Binding var selectedTaskID: String?
+    let selectedTaskID: String?
+    let inspectTask: (String) -> Void
     private let initialDraft: String
     @State private var showsTasks = false
 
     /// One-time draft seed used only by self-contained previews.
-    init(store: StudioStore, outcome: Outcome, selectedTaskID: Binding<String?>, initialDraft: String = "") {
+    init(store: StudioStore, outcome: Outcome, selectedTaskID: String?, initialDraft: String = "",
+         inspectTask: @escaping (String) -> Void) {
         self.store = store
         self.outcome = outcome
-        _selectedTaskID = selectedTaskID
+        self.selectedTaskID = selectedTaskID
+        self.inspectTask = inspectTask
         self.initialDraft = initialDraft
     }
 
@@ -41,7 +44,7 @@ struct EngineeringRoomView: View {
                             }
                         }
                         if let plan = outcome.plan {
-                            TaskSummaryView(tasks: plan.tasks, selectedTaskID: $selectedTaskID)
+                            TaskSummaryView(tasks: plan.tasks, selectedTaskID: selectedTaskID, inspectTask: inspectTask)
                         }
                         if let selectedTask, !showsTasks {
                             ProposedHandoffView(task: selectedTask)
@@ -123,6 +126,8 @@ struct OutcomeSummary: View {
                     .buttonStyle(.glass).tint(.orange).controlSize(.large)
             } else if waiting {
                 Label("Waiting for your answers", systemImage: "bubble.left.and.text.bubble.right")
+            } else if store.isQueuedForPlanning(outcome.id) {
+                Label("Planning queued", systemImage: "clock")
             } else if store.usesOnDeviceModel {
                 Button(outcome.plan == nil ? "Prepare Plan" : "Update Plan", systemImage: "play.fill") { store.plan(outcome) }
                     .buttonStyle(.glassProminent).tint(.green).controlSize(.large).disabled(store.isPlanning)
@@ -223,10 +228,13 @@ struct QuestionBatchView: View {
                         } label: {
                             HStack {
                                 Image(systemName: (answers[question.id] ?? question.answer) == option ? "largecircle.fill.circle" : "circle")
+                                    .accessibilityHidden(true)
                                 Text(option).multilineTextAlignment(.leading)
                                 Spacer(minLength: 0)
                             }.padding(.vertical, 6).frame(minHeight: 44)
                         }.buttonStyle(.bordered)
+                            .accessibilityLabel(option)
+                            .accessibilityAddTraits((answers[question.id] ?? question.answer) == option ? [.isSelected] : [])
                     }
                     TextField("Your answer", text: Binding(
                         get: { answers[question.id] ?? question.answer ?? "" },

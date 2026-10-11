@@ -19,9 +19,9 @@ Observed after refinement:
 
 ## Functional checks
 
-The native preview host executes state regression checks against the real `StudioStore`: per-outcome draft identity and isolation, retained edits, successful-send clearing, rejected-send retention, correct message ownership, disk saving and retry after a corrupt-file load. The existing Swift 6.4 core suite has 12 tests covering coordination and persistence.
+The native preview host executes state regression checks against the real `StudioStore`: per-outcome draft identity and isolation, retained edits, successful-send clearing, rejected-send retention, correct message ownership, disk saving and retry after a corrupt-file load. The existing Swift 6.4 core suite has 14 tests covering coordination and persistence.
 
-Both app scene branches and shared views are typechecked with the installed SDK 26 toolchain. The screenshot host replaces FoundationPlanner with a disabled service. This is deliberately separate from the complete Swift 6.4 / SDK 27 app build, which now succeeds on the documented `xcode-27` runner.
+The preview pipeline now requires Xcode 27 / Swift 6.4 and typechecks both app scene branches and shared views against SDK 27. The screenshot host replaces FoundationPlanner with a disabled service. Full production builds compile the actual model service separately. Earlier stored captures retain their original SDK 26 provenance.
 
 ## Remaining acceptance work
 

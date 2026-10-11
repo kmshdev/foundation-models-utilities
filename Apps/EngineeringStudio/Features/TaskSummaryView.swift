@@ -3,7 +3,8 @@ import SwiftUI
 
 struct TaskSummaryView: View {
     let tasks: [WorkTask]
-    @Binding var selectedTaskID: String?
+    let selectedTaskID: String?
+    let inspectTask: (String) -> Void
     @Environment(\.dynamicTypeSize) private var dynamicType
 
     var body: some View {
@@ -43,7 +44,7 @@ struct TaskSummaryView: View {
             VStack(spacing: 0) {
                 Divider()
                 TaskSummaryRow(task: task, selected: selectedTaskID == task.id, compact: compact) {
-                    selectedTaskID = task.id
+                    inspectTask(task.id)
                 }
             }
         }

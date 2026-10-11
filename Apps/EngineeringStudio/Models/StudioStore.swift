@@ -16,16 +16,20 @@ final class OutcomeDraft {
 
 @MainActor @Observable
 final class StudioStore {
+    typealias Planner = @MainActor (String, String) async throws -> PlanningResult
     private(set) var workspace = Workspace()
     private(set) var isLoaded = false
     private(set) var isPlanning = false
     private(set) var planningOutcomeID: UUID?
     private(set) var saveState = "Opening workspace"
     var failure: String?
-    var usesOnDeviceModel = false
+    private(set) var usesOnDeviceModel = false
     private let repository: WorkspaceRepository
+    @ObservationIgnored private let planner: Planner
     @ObservationIgnored private var loadStarted = false
     @ObservationIgnored private var planningTask: Task<Void, Never>?
+    private var planningQueue: [UUID] = []
+    @ObservationIgnored private var contextVersions: [UUID: Int] = [:]
     @ObservationIgnored private var drafts: [UUID: OutcomeDraft] = [:]
     @ObservationIgnored private var draftSaveTask: Task<Void, Never>?
     @ObservationIgnored private var saveTask: Task<Bool, Never>?
@@ -35,11 +39,17 @@ final class StudioStore {
     init() {
         let directory = URL.applicationSupportDirectory.appendingPathComponent("EngineeringStudio", isDirectory: true)
         repository = WorkspaceRepository(url: directory.appendingPathComponent("workspace.json"))
+        planner = FoundationPlanner.onDevice
         usesOnDeviceModel = UserDefaults.standard.bool(forKey: "usesOnDeviceModel")
     }
 
     /// Dependency injection for persistence checks; no user defaults are changed.
-    init(repository: WorkspaceRepository) { self.repository = repository }
+    init(repository: WorkspaceRepository, usesOnDeviceModel: Bool = false,
+         planner: @escaping Planner = FoundationPlanner.onDevice) {
+        self.repository = repository
+        self.usesOnDeviceModel = usesOnDeviceModel
+        self.planner = planner
+    }
 
     /// Retains unsent text across outcome/view switches and app relaunches.
     /// The composer observes its own draft, so typing does not invalidate history.
@@ -61,6 +71,7 @@ final class StudioStore {
             // One snapshot contains both the message and the cleared draft.
             // Retry only writes this snapshot; it never records another message.
             persist()
+            enqueuePlanning(for: outcomeID)
             return true
         } catch { failure = error.localizedDescription; return false }
     }
@@ -70,6 +81,7 @@ final class StudioStore {
     init(preview workspace: Workspace) {
         self.workspace = workspace
         repository = WorkspaceRepository(url: URL.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+        planner = FoundationPlanner.onDevice
         isLoaded = true
         loadStarted = true
         saveState = "Preview data · not connected"
@@ -107,39 +119,82 @@ final class StudioStore {
     }
 
     func plan(_ outcome: Outcome) {
-        guard usesOnDeviceModel, !isPlanning,
-              !workspace.questions.contains(where: { $0.outcomeID == outcome.id && !$0.isComplete }) else { return }
+        enqueuePlanning(for: outcome.id)
+    }
+
+    func isQueuedForPlanning(_ outcomeID: UUID) -> Bool {
+        planningQueue.contains(outcomeID)
+    }
+
+    private func enqueuePlanning(for outcomeID: UUID) {
+        // Version even gated requests so changing answers cannot publish a plan
+        // produced from the old answer set while a model call is suspended.
+        contextVersions[outcomeID, default: 0] += 1
+        guard isLoaded, usesOnDeviceModel,
+              workspace.outcomes.contains(where: { $0.id == outcomeID }),
+              !hasUnansweredQuestions(for: outcomeID) else { return }
+        if !planningQueue.contains(outcomeID) { planningQueue.append(outcomeID) }
+        startPlanningIfNeeded()
+    }
+
+    private func hasUnansweredQuestions(for outcomeID: UUID) -> Bool {
+        workspace.questions.contains { $0.outcomeID == outcomeID && !$0.isComplete }
+    }
+
+    private func startPlanningIfNeeded() {
+        guard planningTask == nil, usesOnDeviceModel, !planningQueue.isEmpty else { return }
         isPlanning = true
-        planningOutcomeID = outcome.id
-        let answers = workspace.questions.filter { $0.outcomeID == outcome.id }.flatMap(\.questions)
-            .compactMap { question in question.answer.map { "\(question.prompt): \($0)" } }.joined(separator: "\n")
         planningTask = Task {
-            defer { isPlanning = false; planningOutcomeID = nil; planningTask = nil }
-            do {
-                let context = workspace.messages.filter { $0.outcomeID == outcome.id && $0.author == .user && $0.text != outcome.text }
-                    .map(\.text).joined(separator: "\n")
-                let result = try await FoundationPlanner.onDevice(outcome: outcome.text, answers: [answers, context].joined(separator: "\n"))
-                try Task.checkCancellation()
-                if !result.questions.isEmpty {
-                    workspace.questions.append(.init(outcomeID: outcome.id, questions: result.questions))
-                    workspace.messages.append(.init(author: .coordinator, text: "I need these details to finish the assignment plan. You can answer them together below.", outcomeID: outcome.id))
-                    workspace.revision += 1
-                } else if let plan = result.plan {
-                    try workspace.attach(plan, to: outcome.id)
+            defer {
+                isPlanning = false; planningOutcomeID = nil; planningTask = nil
+                // A new request may arrive while a cancelled provider unwinds.
+                // Keep one provider call active at a time, including that period.
+                startPlanningIfNeeded()
+            }
+            while !Task.isCancelled, usesOnDeviceModel, !planningQueue.isEmpty {
+                let outcomeID = planningQueue.removeFirst()
+                guard !hasUnansweredQuestions(for: outcomeID),
+                      let outcome = workspace.outcomes.first(where: { $0.id == outcomeID }) else { continue }
+                planningOutcomeID = outcomeID
+                let version = contextVersions[outcomeID, default: 0]
+                let answers = workspace.questions.filter { $0.outcomeID == outcomeID }.flatMap(\.questions)
+                    .compactMap { question in question.answer.map { "\(question.prompt): \($0)" } }.joined(separator: "\n")
+                let context = workspace.messages.filter { $0.outcomeID == outcomeID && $0.author == .user }
+                    .dropFirst().map(\.text).joined(separator: "\n")
+                do {
+                    let result = try await planner(outcome.text, [answers, context].joined(separator: "\n"))
+                    try Task.checkCancellation()
+                    guard usesOnDeviceModel, contextVersions[outcomeID] == version,
+                          !hasUnansweredQuestions(for: outcomeID) else { continue }
+                    if !result.questions.isEmpty {
+                        workspace.questions.append(.init(outcomeID: outcomeID, questions: result.questions))
+                        workspace.messages.append(.init(author: .coordinator, text: "I need these details to finish the assignment plan. You can answer them together below.", outcomeID: outcomeID))
+                        workspace.revision += 1
+                    } else if let plan = result.plan {
+                        try workspace.attach(plan, to: outcomeID)
+                    }
+                    persist()
+                } catch is CancellationError { }
+                catch {
+                    if !Task.isCancelled, contextVersions[outcomeID] == version {
+                        failure = error.localizedDescription
+                    }
                 }
-                persist()
-            } catch is CancellationError { }
-            catch { failure = error.localizedDescription }
+            }
         }
     }
 
-    func cancelPlanning() { planningTask?.cancel() }
+    func cancelPlanning() {
+        planningQueue.removeAll()
+        planningTask?.cancel()
+    }
 
     @discardableResult func send(_ text: String, to outcomeID: UUID) -> Bool {
         guard isLoaded else { return false }
         do {
             try workspace.recordMessage(text, for: outcomeID)
             persist()
+            enqueuePlanning(for: outcomeID)
             return true
         } catch { failure = error.localizedDescription; return false }
     }
@@ -149,8 +204,7 @@ final class StudioStore {
         do {
             try workspace.questions[index].answer(answers)
             workspace.revision += 1; persist()
-            if workspace.questions[index].isComplete,
-               let outcome = workspace.outcomes.first(where: { $0.id == batch.outcomeID }) { plan(outcome) }
+            enqueuePlanning(for: workspace.questions[index].outcomeID)
         } catch { failure = error.localizedDescription }
     }
 

@@ -1,4 +1,4 @@
-// Run with `swift Tools/SwiftUIPreview/BuildPreview.swift` on macOS 26+.
+// Run with `swift Tools/SwiftUIPreview/BuildPreview.swift` using Xcode 27 / Swift 6.4.
 // Builds a disposable screenshot host. Production project/SDK settings are not changed.
 import Foundation
 
@@ -24,10 +24,18 @@ let resources = bundle.appendingPathComponent("Contents/Resources", isDirectory:
 try FileManager.default.createDirectory(at: executables, withIntermediateDirectories: true)
 try FileManager.default.createDirectory(at: resources, withIntermediateDirectories: true)
 let sdk = try run(["--sdk", "macosx", "--show-sdk-path"], capture: true)
+let compilerVersion = try run(["swift", "--version"], capture: true)
+let macSDKVersion = try run(["--sdk", "macosx", "--show-sdk-version"], capture: true)
+let iosSDKVersion = try run(["--sdk", "iphonesimulator", "--show-sdk-version"], capture: true)
+guard compilerVersion.contains("Swift version 6.4"), macSDKVersion.hasPrefix("27."), iosSDKVersion.hasPrefix("27.") else {
+    throw NSError(domain: "PreviewBuild", code: 1, userInfo: [NSLocalizedDescriptionKey:
+        "Select Xcode 27 with Swift 6.4 and iOS/macOS 27 SDKs before capturing previews."])
+}
+print("Preview toolchain: \(compilerVersion); macOS SDK \(macSDKVersion); iOS SDK \(iosSDKVersion)")
 #if arch(arm64)
-let target = "arm64-apple-macos26.0"
+let target = "arm64-apple-macos27.0"
 #else
-let target = "x86_64-apple-macos26.0"
+let target = "x86_64-apple-macos27.0"
 #endif
 let common = ["-sdk", sdk, "-target", target, "-swift-version", "6", "-D", "DEBUG"]
 func sources(_ path: String) throws -> [String] {
@@ -44,7 +52,7 @@ let appSources = try sources("Apps/EngineeringStudio/Features") + sources("Apps/
 let iosOutput = output.appendingPathComponent("ios", isDirectory: true)
 try FileManager.default.createDirectory(at: iosOutput, withIntermediateDirectories: true)
 let iosSDK = try run(["--sdk", "iphonesimulator", "--show-sdk-path"], capture: true)
-let iosCommon = ["-sdk", iosSDK, "-target", "arm64-apple-ios26.0-simulator", "-swift-version", "6", "-D", "DEBUG"]
+let iosCommon = ["-sdk", iosSDK, "-target", "arm64-apple-ios27.0-simulator", "-swift-version", "6", "-D", "DEBUG"]
 try run(["swiftc"] + iosCommon + ["-parse-as-library", "-emit-module", "-module-name", "EngineeringCore",
         "-emit-module-path", iosOutput.appendingPathComponent("EngineeringCore.swiftmodule").path]
         + sources("Packages/EngineeringCore/Sources/EngineeringCore"))
@@ -60,10 +68,10 @@ try run(["swiftc"] + common + ["-parse-as-library", "-I", output.path, "-L", out
         root.appendingPathComponent("Tools/SwiftUIPreview/PreviewHost.swift").path,
         root.appendingPathComponent("Tools/SwiftUIPreview/StoreChecks.swift").path])
 try run(["actool", root.appendingPathComponent("Apps/EngineeringStudio/Assets.xcassets").path,
-        "--compile", resources.path, "--platform", "macosx", "--minimum-deployment-target", "26.0"])
+        "--compile", resources.path, "--platform", "macosx", "--minimum-deployment-target", "27.0"])
 let info: [String: Any] = ["CFBundleExecutable": "SwiftUIPreview", "CFBundleIdentifier": "dev.kmsh.engineeringstudio.preview",
                          "CFBundleName": "Engineering Studio Preview", "CFBundlePackageType": "APPL",
-                         "LSMinimumSystemVersion": "26.0", "NSHighResolutionCapable": true]
+                         "LSMinimumSystemVersion": "27.0", "NSHighResolutionCapable": true]
 try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0)
     .write(to: bundle.appendingPathComponent("Contents/Info.plist"))
 print("Built native UI-only preview host at \(bundle.path)")
