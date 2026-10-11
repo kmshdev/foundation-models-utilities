@@ -98,7 +98,6 @@ struct StudioRootView: View {
                             Label(store.isPlanning ? "Cancel Planning" : "Pause Team",
                                   systemImage: store.isPlanning ? "stop.fill" : "pause.fill")
                                 .font(.system(size: 15, weight: .medium)).padding(.horizontal, 6).frame(height: 28)
-                                .foregroundStyle(.orange)
                         }
                         .labelStyle(.titleAndIcon)
                         .buttonStyle(.glass).tint(.orange).disabled(!store.isPlanning)
@@ -108,7 +107,6 @@ struct StudioRootView: View {
                             Button("Settings", systemImage: "gearshape") { openSettings() }
                         } label: {
                             Image(systemName: "ellipsis").font(.system(size: 18)).frame(width: 40, height: 40)
-                                .glassEffect(.regular, in: .circle)
                         }
                         .menuIndicator(.hidden).buttonStyle(.glass).buttonBorderShape(.circle)
                         .accessibilityLabel("More options")
@@ -310,8 +308,10 @@ struct StudioRootView: View {
                 } description: {
                     Text("Start with a shared outcome for your engineering team.")
                 } actions: {
-                    Button("New Outcome", systemImage: "plus") { sheet = .newOutcome }
-                        .buttonStyle(.glassProminent).disabled(!store.isLoaded)
+                    Button { sheet = .newOutcome } label: {
+                        Label("New Outcome", systemImage: "plus").frame(minHeight: 36)
+                    }
+                    .buttonStyle(.glassProminent).controlSize(.large).disabled(!store.isLoaded)
                 }
             }
         }
