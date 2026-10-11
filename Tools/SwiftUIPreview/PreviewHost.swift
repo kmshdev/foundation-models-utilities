@@ -76,7 +76,6 @@ private final class CaptureDelegate: NSObject, NSApplicationDelegate {
             // Explicit preview traits keep standard and accessibility captures
             // reproducible. Production views inherit the user's display settings.
             .environment(\.legibilityWeight, highContrast ? .bold : .regular)
-            .environment(\.colorSchemeContrast, highContrast ? .increased : .standard)
             .tint(.blue)
         let host = NSHostingView(rootView: root)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: width, height: height),
