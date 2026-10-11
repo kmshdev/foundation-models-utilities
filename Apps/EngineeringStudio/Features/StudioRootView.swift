@@ -12,6 +12,7 @@ private enum StudioSheet: String, Identifiable {
 struct StudioRootView: View {
     let store: StudioStore
     let connections: ServiceConnections
+    let chatGPT: ChatGPTConnection
     #if os(macOS)
     @Environment(\.openSettings) private var openSettings
     #endif
@@ -24,10 +25,11 @@ struct StudioRootView: View {
     @State private var search = ""
 
     /// One-time selection seeds for self-contained SwiftUI previews.
-    init(store: StudioStore, connections: ServiceConnections = ServiceConnections(),
+    init(store: StudioStore, connections: ServiceConnections = ServiceConnections(), chatGPT: ChatGPTConnection = ChatGPTConnection(),
          initialOutcomeID: UUID? = nil, initialTaskID: String? = nil, initialDraft: String = "") {
         self.store = store
         self.connections = connections
+        self.chatGPT = chatGPT
         self.initialDraft = initialDraft
         _destination = State(initialValue: initialOutcomeID.map(WorkspaceDestination.outcome) ?? .all)
         _selectedTaskID = State(initialValue: initialTaskID)
@@ -144,7 +146,7 @@ struct StudioRootView: View {
         .searchable(text: $search, prompt: "Search outcomes")
         #endif
         .sheet(item: $sheet) { item in
-            StudioSheetView(kind: item, store: store, connections: connections)
+            StudioSheetView(kind: item, store: store, connections: connections, chatGPT: chatGPT)
         }
         .onChange(of: destination) { _, _ in selectedTaskID = nil }
         .onChange(of: search) { _, query in
@@ -333,6 +335,7 @@ private struct StudioSheetView: View {
     let kind: StudioSheet
     let store: StudioStore
     let connections: ServiceConnections
+    let chatGPT: ChatGPTConnection
     @Environment(\.dismiss) private var dismiss
     var body: some View {
         NavigationStack {
@@ -340,7 +343,7 @@ private struct StudioSheetView: View {
                 switch kind {
                 case .newOutcome: NewOutcomeView(store: store)
                 case .team: TeamView()
-                case .settings: StudioSettingsView(store: store, connections: connections)
+                case .settings: StudioSettingsView(store: store, connections: connections, chatGPT: chatGPT)
                 case .connections: ServiceConnectionsView(connections: connections, store: store)
                 }
             }

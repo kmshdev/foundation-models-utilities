@@ -23,9 +23,12 @@ final class StudioStore {
     private(set) var planningOutcomeID: UUID?
     private(set) var saveState = "Opening workspace"
     var failure: String?
-    private(set) var usesOnDeviceModel = false
+    private(set) var planningProvider: PlanningProvider = .disabled
+    var usesOnDeviceModel: Bool { planningProvider == .onDevice }
+    var isPlanningEnabled: Bool { planningProvider != .disabled }
     private let repository: WorkspaceRepository
     @ObservationIgnored private let planner: Planner
+    @ObservationIgnored private var subscriptionPlanner: Planner?
     @ObservationIgnored private var loadStarted = false
     @ObservationIgnored private var planningTask: Task<Void, Never>?
     private var planningQueue: [UUID] = []
@@ -40,14 +43,19 @@ final class StudioStore {
         let directory = URL.applicationSupportDirectory.appendingPathComponent("EngineeringStudio", isDirectory: true)
         repository = WorkspaceRepository(url: directory.appendingPathComponent("workspace.json"))
         planner = FoundationPlanner.onDevice
-        usesOnDeviceModel = UserDefaults.standard.bool(forKey: "usesOnDeviceModel")
+        if let saved = UserDefaults.standard.string(forKey: "planningProvider"),
+           let provider = PlanningProvider(rawValue: saved) {
+            planningProvider = provider
+        } else {
+            planningProvider = UserDefaults.standard.bool(forKey: "usesOnDeviceModel") ? .onDevice : .disabled
+        }
     }
 
     /// Dependency injection for persistence checks; no user defaults are changed.
     init(repository: WorkspaceRepository, usesOnDeviceModel: Bool = false,
          planner: @escaping Planner = FoundationPlanner.onDevice) {
         self.repository = repository
-        self.usesOnDeviceModel = usesOnDeviceModel
+        planningProvider = usesOnDeviceModel ? .onDevice : .disabled
         self.planner = planner
     }
 
@@ -102,9 +110,19 @@ final class StudioStore {
     }
 
     func setOnDeviceModel(_ enabled: Bool) {
-        usesOnDeviceModel = enabled
-        UserDefaults.standard.set(enabled, forKey: "usesOnDeviceModel")
-        if !enabled { cancelPlanning() }
+        setPlanningProvider(enabled ? .onDevice : .disabled)
+    }
+
+    func configureSubscriptionPlanner(_ planner: @escaping Planner) {
+        subscriptionPlanner = planner
+    }
+
+    func setPlanningProvider(_ provider: PlanningProvider) {
+        guard planningProvider != provider else { return }
+        cancelPlanning()
+        planningProvider = provider
+        UserDefaults.standard.set(provider.rawValue, forKey: "planningProvider")
+        UserDefaults.standard.set(provider == .onDevice, forKey: "usesOnDeviceModel")
     }
 
     @discardableResult func submit(_ text: String) -> Bool {
@@ -112,7 +130,7 @@ final class StudioStore {
         do {
             try workspace.recordOutcome(text)
             persist()
-            if usesOnDeviceModel, let outcome = workspace.outcomes.last { plan(outcome) }
+            if isPlanningEnabled, let outcome = workspace.outcomes.last { plan(outcome) }
             return true
         }
         catch { failure = error.localizedDescription; return false }
@@ -167,7 +185,7 @@ final class StudioStore {
         // Version even gated requests so changing answers cannot publish a plan
         // produced from the old answer set while a model call is suspended.
         contextVersions[outcomeID, default: 0] += 1
-        guard isLoaded, usesOnDeviceModel,
+        guard isLoaded, isPlanningEnabled,
               workspace.outcomes.contains(where: { $0.id == outcomeID }),
               !hasUnansweredQuestions(for: outcomeID) else { return }
         if !planningQueue.contains(outcomeID) { planningQueue.append(outcomeID) }
@@ -179,7 +197,7 @@ final class StudioStore {
     }
 
     private func startPlanningIfNeeded() {
-        guard planningTask == nil, usesOnDeviceModel, !planningQueue.isEmpty else { return }
+        guard planningTask == nil, isPlanningEnabled, !planningQueue.isEmpty else { return }
         isPlanning = true
         planningTask = Task {
             defer {
@@ -188,7 +206,7 @@ final class StudioStore {
                 // Keep one provider call active at a time, including that period.
                 startPlanningIfNeeded()
             }
-            while !Task.isCancelled, usesOnDeviceModel, !planningQueue.isEmpty {
+            while !Task.isCancelled, isPlanningEnabled, !planningQueue.isEmpty {
                 let outcomeID = planningQueue.removeFirst()
                 guard !hasUnansweredQuestions(for: outcomeID),
                       let outcome = workspace.outcomes.first(where: { $0.id == outcomeID }) else { continue }
@@ -199,9 +217,19 @@ final class StudioStore {
                 let context = workspace.messages.filter { $0.outcomeID == outcomeID && $0.author == .user }
                     .dropFirst().map(\.text).joined(separator: "\n")
                 do {
-                    let result = try await planner(outcome.text, [answers, context].joined(separator: "\n"))
+                    let selectedPlanner: Planner
+                    switch planningProvider {
+                    case .onDevice: selectedPlanner = planner
+                    case .chatGPT:
+                        guard let subscriptionPlanner else {
+                            throw ChatGPTConnectionError.notConnected
+                        }
+                        selectedPlanner = subscriptionPlanner
+                    case .disabled: continue
+                    }
+                    let result = try await selectedPlanner(outcome.text, [answers, context].joined(separator: "\n"))
                     try Task.checkCancellation()
-                    guard usesOnDeviceModel, contextVersions[outcomeID] == version,
+                    guard isPlanningEnabled, contextVersions[outcomeID] == version,
                           !hasUnansweredQuestions(for: outcomeID) else { continue }
                     if !result.questions.isEmpty {
                         workspace.questions.append(.init(outcomeID: outcomeID, questions: result.questions))

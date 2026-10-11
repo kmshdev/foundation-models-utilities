@@ -39,14 +39,29 @@ let target = "x86_64-apple-macos27.0"
 #endif
 let common = ["-sdk", sdk, "-target", target, "-swift-version", "6", "-D", "DEBUG"]
 func sources(_ path: String) throws -> [String] {
-    try FileManager.default.contentsOfDirectory(at: root.appendingPathComponent(path), includingPropertiesForKeys: nil)
-        .filter { $0.pathExtension == "swift" }.map(\.path).sorted()
+    guard let enumerator = FileManager.default.enumerator(at: root.appendingPathComponent(path),
+        includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles]) else {
+        throw CocoaError(.fileReadNoSuchFile)
+    }
+    return enumerator.compactMap { item -> String? in
+        guard let url = item as? URL, url.pathExtension == "swift" else { return nil }
+        return url.path
+    }.sorted()
 }
 let library = output.appendingPathComponent("libEngineeringCore.a").path
 try run(["swiftc"] + common + ["-parse-as-library", "-emit-library", "-static", "-emit-module", "-module-name", "EngineeringCore",
         "-emit-module-path", output.appendingPathComponent("EngineeringCore.swiftmodule").path, "-o", library]
         + sources("Packages/EngineeringCore/Sources/EngineeringCore"))
+let utilitiesSources = try sources("Sources/FoundationModelsUtilities")
+let utilitiesFlags = ["-enable-experimental-feature", "InternalImportsByDefault",
+                      "-enable-experimental-feature", "NonisolatedNonsendingByDefault",
+                      "-enable-upcoming-feature", "MemberImportVisibility"]
+try run(["swiftc"] + common + utilitiesFlags + ["-parse-as-library", "-emit-library", "-static", "-emit-module",
+        "-module-name", "FoundationModelsUtilities", "-emit-module-path",
+        output.appendingPathComponent("FoundationModelsUtilities.swiftmodule").path, "-o",
+        output.appendingPathComponent("libFoundationModelsUtilities.a").path] + utilitiesSources)
 let appSources = try sources("Apps/EngineeringStudio/Features") + sources("Apps/EngineeringStudio/Models")
+    + sources("Apps/EngineeringStudio/Services")
 // Check the shared views against the installed iOS SDK as well. This does not
 // replace the production Swift 6.4 / SDK 27 build or execute the model service.
 let iosOutput = output.appendingPathComponent("ios", isDirectory: true)
@@ -56,18 +71,20 @@ let iosCommon = ["-sdk", iosSDK, "-target", "arm64-apple-ios27.0-simulator", "-s
 try run(["swiftc"] + iosCommon + ["-parse-as-library", "-emit-module", "-module-name", "EngineeringCore",
         "-emit-module-path", iosOutput.appendingPathComponent("EngineeringCore.swiftmodule").path]
         + sources("Packages/EngineeringCore/Sources/EngineeringCore"))
+try run(["swiftc"] + iosCommon + utilitiesFlags + ["-parse-as-library", "-emit-module", "-module-name", "FoundationModelsUtilities",
+        "-emit-module-path", iosOutput.appendingPathComponent("FoundationModelsUtilities.swiftmodule").path] + utilitiesSources)
 try run(["swiftc"] + iosCommon + ["-typecheck", "-parse-as-library", "-I", iosOutput.path] + appSources + [
-        root.appendingPathComponent("Tools/SwiftUIPreview/PreviewPlanner.swift").path,
         root.appendingPathComponent("Apps/EngineeringStudio/EngineeringStudioApp.swift").path])
 try run(["swiftc"] + common + ["-typecheck", "-parse-as-library", "-I", output.path] + appSources + [
-        root.appendingPathComponent("Tools/SwiftUIPreview/PreviewPlanner.swift").path,
         root.appendingPathComponent("Apps/EngineeringStudio/EngineeringStudioApp.swift").path])
-try run(["swiftc"] + common + ["-parse-as-library", "-I", output.path, "-L", output.path, "-lEngineeringCore",
+try run(["swiftc"] + common + ["-parse-as-library", "-I", output.path, "-L", output.path, "-lEngineeringCore", "-lFoundationModelsUtilities",
         "-o", executables.appendingPathComponent("SwiftUIPreview").path] + appSources + [
-        root.appendingPathComponent("Tools/SwiftUIPreview/PreviewPlanner.swift").path,
         root.appendingPathComponent("Tools/SwiftUIPreview/PreviewHost.swift").path,
         root.appendingPathComponent("Tools/SwiftUIPreview/StoreChecks.swift").path,
-        root.appendingPathComponent("Tools/SwiftUIPreview/ServiceChecks.swift").path])
+        root.appendingPathComponent("Tools/SwiftUIPreview/ServiceChecks.swift").path,
+        root.appendingPathComponent("Tools/SwiftUIPreview/SubscriptionModelChecks.swift").path,
+        root.appendingPathComponent("Tools/SwiftUIPreview/AuthenticationChecks.swift").path,
+        root.appendingPathComponent("Tools/SwiftUIPreview/ChatGPTConnectionChecks.swift").path])
 try run(["actool", root.appendingPathComponent("Apps/EngineeringStudio/Assets.xcassets").path,
         "--compile", resources.path, "--platform", "macosx", "--minimum-deployment-target", "27.0"])
 let info: [String: Any] = ["CFBundleExecutable": "SwiftUIPreview", "CFBundleIdentifier": "dev.kmsh.engineeringstudio.preview",

@@ -7,6 +7,7 @@ import AppKit
 struct EngineeringStudioApp: App {
     @State private var store = StudioStore()
     @State private var connections = ServiceConnections()
+    @State private var chatGPT = ChatGPTConnection()
     @Environment(\.scenePhase) private var scenePhase
     #if os(macOS)
     @NSApplicationDelegateAdaptor(StudioAppDelegate.self) private var appDelegate
@@ -14,14 +15,24 @@ struct EngineeringStudioApp: App {
 
     var body: some Scene {
         WindowGroup {
-            StudioRootView(store: store, connections: connections)
+            StudioRootView(store: store, connections: connections, chatGPT: chatGPT)
                 .task {
                     #if os(macOS)
                     appDelegate.store = store
                     #endif
+                    store.configureSubscriptionPlanner { outcome, answers in
+                        try await FoundationPlanner.subscription(outcome: outcome, answers: answers,
+                                                                 client: chatGPT.responsesClient,
+                                                                 modelName: chatGPT.requireSelectedModel())
+                    }
                     await store.load()
-                    await connections.load()
+                    async let serviceLoad: Void = connections.load()
+                    async let accountLoad: Void = chatGPT.load()
+                    _ = await (serviceLoad, accountLoad)
                 }
+                .onChange(of: chatGPT.activeAccount?.id) { _, _ in store.cancelPlanning() }
+                .onChange(of: chatGPT.selectedModel) { _, _ in store.cancelPlanning() }
+                .onChange(of: chatGPT.isSignedIn) { _, signedIn in if !signedIn { store.cancelPlanning() } }
                 .onChange(of: scenePhase) { _, phase in
                     if phase != .active { Task { await store.flushPendingChanges() } }
                 }
@@ -38,7 +49,7 @@ struct EngineeringStudioApp: App {
         #if os(macOS)
         Settings {
             NavigationStack {
-                StudioSettingsView(store: store, connections: connections)
+                StudioSettingsView(store: store, connections: connections, chatGPT: chatGPT)
             }
                 .frame(width: 560, height: 620)
         }

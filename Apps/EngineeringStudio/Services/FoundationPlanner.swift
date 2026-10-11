@@ -33,6 +33,7 @@ private struct GeneratedPlan {
 
 private struct EngineeringProfile<Model: LanguageModel>: LanguageModelSession.DynamicProfile {
     let model: Model
+    let sourceDescription: String
     var body: some LanguageModelSession.DynamicProfile {
         Profile {
             Instructions("""
@@ -43,7 +44,7 @@ private struct EngineeringProfile<Model: LanguageModel>: LanguageModelSession.Dy
             All implementation code must be Swift. Use Apple frameworks and documented Swift ecosystem APIs.
             Prefer Cloudflare only where compatible with that requirement; do not introduce a non-Swift runtime.
             Known Linear project: Engineering Workflow Automation. Personal ChatGPT access is requested;
-            never substitute API billing or invent authentication endpoints. This session uses Apple's on-device model.
+            never substitute API billing or invent authentication endpoints. Active model: \(sourceDescription).
             Priority: explicit user order, urgent defects, dependency blockers, Linear priority.
             There are no routine approval checkpoints. Batch only genuinely blocking questions and wait for answers.
             Assign one owner per task, measurable acceptance criteria, explicit dependencies and handoff context.
@@ -93,10 +94,17 @@ enum FoundationPlanner {
         return try await generate(using: SystemLanguageModel.default, outcome: outcome, answers: answers)
     }
 
+    static func subscription(outcome: String, answers: String, client: ChatGPTResponsesClient,
+                             modelName: String) async throws -> PlanningResult {
+        try await generate(using: ChatGPTLanguageModel(name: modelName, client: client),
+                           outcome: outcome, answers: answers, sourceDescription: "ChatGPT subscription model \(modelName)")
+    }
+
     /// The same session/profile accepts a conforming server model when its supported
     /// authentication and transport are implemented. No subscription credentials are fabricated.
-    static func generate<Model: LanguageModel>(using model: Model, outcome: String, answers: String) async throws -> PlanningResult {
-        let session = LanguageModelSession(profile: EngineeringProfile(model: model))
+    static func generate<Model: LanguageModel>(using model: Model, outcome: String, answers: String,
+                                               sourceDescription: String = "Apple's on-device model") async throws -> PlanningResult {
+        let session = LanguageModelSession(profile: EngineeringProfile(model: model, sourceDescription: sourceDescription))
         do {
             let response = try await session.respond(
                 to: "Outcome:\n\(outcome)\n\nPreviously answered questions:\n\(answers)",

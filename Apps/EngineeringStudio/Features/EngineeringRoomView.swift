@@ -140,11 +140,11 @@ struct OutcomeSummary: View {
                 Label("Waiting for your answers", systemImage: "bubble.left.and.text.bubble.right")
             } else if store.isQueuedForPlanning(outcome.id) {
                 Label("Planning queued", systemImage: "clock")
-            } else if store.usesOnDeviceModel {
+            } else if store.isPlanningEnabled {
                 Button(outcome.plan == nil ? "Prepare Plan" : "Update Plan", systemImage: "play.fill") { store.plan(outcome) }
                     .buttonStyle(.glassProminent).tint(.green).controlSize(.large).disabled(store.isPlanning)
             } else if outcome.plan == nil {
-                Text("Enable Apple Intelligence in Settings to prepare assignments on this device.").foregroundStyle(.secondary)
+                Text("Choose a planning model in Settings to prepare assignments.").foregroundStyle(.secondary)
             }
             Label(outcome.plan == nil ? "Developer execution is not connected." : "Plan saved · Tasks have not been dispatched.",
                   systemImage: "network.slash")

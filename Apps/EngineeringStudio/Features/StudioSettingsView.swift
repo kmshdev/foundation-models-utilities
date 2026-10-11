@@ -3,20 +3,24 @@ import SwiftUI
 struct StudioSettingsView: View {
     let store: StudioStore
     let connections: ServiceConnections
+    let chatGPT: ChatGPTConnection
     var body: some View {
         Form {
             Section {
                 LabeledContent("Access", value: "Personal account")
-                LabeledContent("Connection", value: "Not connected")
-                Text("Your personal ChatGPT connection is not available yet. Messages stay in this workspace until a model connection is ready.")
-                    .foregroundStyle(.secondary)
+                LabeledContent("Connection", value: chatGPT.status)
+                NavigationLink {
+                    ChatGPTConnectionView(connection: chatGPT, store: store)
+                } label: { Label("ChatGPT accounts and models", systemImage: "person.crop.circle") }
             } header: { Text("ChatGPT") }
             Section {
-                Toggle("Use on-device planning", isOn: Binding(get: { store.usesOnDeviceModel }, set: { store.setOnDeviceModel($0) }))
+                Picker("Planning model", selection: Binding(get: { store.planningProvider }, set: { store.setPlanningProvider($0) })) {
+                    ForEach(PlanningProvider.allCases) { provider in Text(provider.title).tag(provider) }
+                }
                 Text(FoundationPlanner.availabilityDescription).foregroundStyle(.secondary)
-                Text("Prepare assignments privately on this device. Developer execution requires a separate connection.")
+                Text("Apple Intelligence prepares assignments on this device. ChatGPT uses your signed-in subscription and selected model.")
                     .font(.callout).foregroundStyle(.secondary)
-            } header: { Text("Apple Intelligence") }
+            } header: { Text("Planning") }
             Section("Project") {
                 LabeledContent("App", value: "Engineering Studio")
                 LabeledContent("Linear", value: "Engineering Workflow Automation")
