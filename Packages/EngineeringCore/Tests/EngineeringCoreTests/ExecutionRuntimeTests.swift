@@ -253,6 +253,165 @@ private func waitFor(_ runtime: ExecutionDeveloperCoordinator, _ predicate: @Sen
         await coordinator.stop()
     }
 
+    @Test func resumedParentAutomaticallyUnblocksUntouchedDependencyChain() async throws {
+        let transport = RuntimeTransport(), worktrees = RuntimeWorktrees(), journal = RuntimeJournal()
+        let coordinator = runtime(transport, worktrees: worktrees, journal: journal), outcomeID = UUID()
+        try await coordinator.start()
+        try await coordinator.dispatch(outcomeID: outcomeID, outcome: "Recover the handoff chain", plan: .init(summary: "Chain", tasks: [
+            runtimeTask("a"), runtimeTask("b", owner: .quality, dependencies: ["a"]),
+            runtimeTask("c", owner: .interface, dependencies: ["b"])]))
+        let reserved = await coordinator.snapshot().records
+        let parent = try #require(reserved.first { $0.task.id == "a" })
+        try await coordinator.cancel(parent.key)
+        await transport.complete(thread: try #require(parent.threadID), turn: try #require(parent.turnID), status: "interrupted")
+        let paused = try await waitFor(coordinator) { snapshot in
+            snapshot.records.first { $0.task.id == "a" }?.status == .cancelled &&
+            snapshot.records.filter { $0.status == .blocked }.count == 2
+        }
+        #expect(paused.records.filter { $0.status == .blocked }.allSatisfy {
+            ExecutionDeveloperCoordinator.canRequeueWithoutDelivery($0)
+        })
+        #expect(await transport.calls("turn/start").count == 1)
+
+        try await coordinator.resume(parent.key)
+        let resumed = try #require(await coordinator.snapshot().records.first { $0.task.id == "a" })
+        #expect(resumed.id == parent.id)
+        #expect(resumed.threadID == parent.threadID)
+        #expect(resumed.worktree == parent.worktree)
+        #expect(await worktrees.dependencyCommits().count == 1)
+        await transport.complete(thread: try #require(resumed.threadID), turn: try #require(resumed.turnID))
+        let afterParent = try await waitFor(coordinator) { $0.records.contains { $0.task.id == "b" && $0.status == .running } }
+        let child = try #require(afterParent.records.first { $0.task.id == "b" })
+        #expect(child.id == reserved.first { $0.task.id == "b" }?.id)
+        #expect(child.task == reserved.first { $0.task.id == "b" }?.task)
+        #expect(child.receivedHandoffs == [parent.key])
+        #expect(afterParent.records.first { $0.task.id == "c" }?.status == .blocked)
+        #expect(await transport.calls("turn/start").count == 3)
+
+        await transport.complete(thread: try #require(child.threadID), turn: try #require(child.turnID))
+        let afterChild = try await waitFor(coordinator) { $0.records.contains { $0.task.id == "c" && $0.status == .running } }
+        let descendant = try #require(afterChild.records.first { $0.task.id == "c" })
+        #expect(descendant.id == reserved.first { $0.task.id == "c" }?.id)
+        #expect(descendant.receivedHandoffs == [parent.key, child.key])
+        #expect(await worktrees.dependencyCommits().count == 3)
+        #expect(await transport.calls("turn/start").count == 4)
+        #expect(await transport.calls("thread/resume").count == 1)
+        #expect(await journal.load().count == 3)
+        await coordinator.stop()
+    }
+
+    @Test func cancellingBeforeStartResumesSameReservationOnceAndRespectsScopeLease() async throws {
+        let transport = RuntimeTransport(), worktrees = RuntimeWorktrees(), journal = RuntimeJournal()
+        let coordinator = runtime(transport, worktrees: worktrees, journal: journal)
+        try await coordinator.start()
+        try await coordinator.dispatch(outcomeID: UUID(), outcome: "Existing owner", plan: .init(summary: "A", tasks: [
+            runtimeTask("a", path: "Shared.swift")]))
+        let waitingID = UUID(), plan = WorkPlan(summary: "B", tasks: [runtimeTask("b", owner: .quality, path: "Shared.swift")])
+        try await coordinator.dispatch(outcomeID: waitingID, outcome: "Waiting owner", plan: plan)
+        let initial = await coordinator.snapshot().records
+        let owner = try #require(initial.first { $0.task.id == "a" })
+        let reserved = try #require(initial.first { $0.task.id == "b" })
+        #expect(reserved.status == .queued)
+        try await coordinator.cancel(reserved.key)
+        let cancelled = try #require(await coordinator.snapshot().records.first { $0.key == reserved.key })
+        #expect(cancelled.status == .cancelled)
+        #expect(ExecutionDeveloperCoordinator.canRequeueWithoutDelivery(cancelled))
+        try await coordinator.resume(reserved.key)
+        try await coordinator.dispatch(outcomeID: waitingID, outcome: "Waiting owner", plan: plan)
+        let waiting = try #require(await coordinator.snapshot().records.first { $0.key == reserved.key })
+        #expect(waiting.status == .queued)
+        #expect(waiting.id == reserved.id && waiting.deliveryID == reserved.deliveryID)
+        #expect(waiting.threadID == nil && waiting.worktree == nil)
+        #expect(await transport.calls("turn/start").count == 1)
+        #expect(await transport.calls("thread/resume").isEmpty)
+        #expect(await worktrees.dependencyCommits().count == 1)
+
+        await transport.complete(thread: try #require(owner.threadID), turn: try #require(owner.turnID))
+        let delivered = try await waitFor(coordinator) { $0.records.contains { $0.key == reserved.key && $0.status == .running } }
+        let resumed = try #require(delivered.records.first { $0.key == reserved.key })
+        #expect(resumed.id == reserved.id && resumed.deliveryID == reserved.deliveryID)
+        #expect(resumed.task == reserved.task)
+        await #expect(throws: ExecutionError.self) { try await coordinator.resume(reserved.key) }
+        try await coordinator.dispatch(outcomeID: waitingID, outcome: "Waiting owner", plan: plan)
+        #expect(await transport.calls("turn/start").count == 2)
+        #expect(await worktrees.dependencyCommits().count == 2)
+        #expect(await journal.load().count == 2)
+        await coordinator.stop()
+    }
+
+    @Test func dependencyRecoveryNeverPromotesUncertainDeliveryOrUnrelatedBlocker() async throws {
+        let outcomeID = UUID(), parentKey = ExecutionTaskKey(outcomeID: outcomeID, taskID: "a")
+        var parent = ExecutionRecord(key: parentKey, outcome: "Recovery", task: runtimeTask("a"))
+        parent.status = .completed; parent.commitSHA = String(repeating: "b", count: 40)
+        var uncertain = ExecutionRecord(key: .init(outcomeID: outcomeID, taskID: "b"), outcome: "Recovery",
+            task: runtimeTask("b", owner: .quality, dependencies: ["a"]))
+        uncertain.status = .blocked; uncertain.blocker = ExecutionError.dependenciesFailed.localizedDescription
+        uncertain.threadID = "retained-thread"
+        uncertain.worktree = .init(url: URL(fileURLWithPath: "/tmp/uncertain-work"), branch: "engineering/retained", baseSHA: String(repeating: "a", count: 40))
+        var unrelated = ExecutionRecord(key: .init(outcomeID: outcomeID, taskID: "c"), outcome: "Recovery",
+            task: runtimeTask("c", owner: .interface, dependencies: ["a"]))
+        unrelated.status = .blocked; unrelated.blocker = "A required local tool is unavailable."
+        var interrupted = ExecutionRecord(key: .init(outcomeID: outcomeID, taskID: "d"), outcome: "Recovery", task: runtimeTask("d", owner: .platforms))
+        interrupted.status = .interrupted
+        let transport = RuntimeTransport(), journal = RuntimeJournal(records: [parent, uncertain, unrelated, interrupted])
+        let coordinator = runtime(transport, journal: journal)
+        try await coordinator.start()
+        try await coordinator.dispatch(outcomeID: outcomeID, outcome: "Recovery", plan: .init(summary: "Recovery", tasks: [
+            parent.task, uncertain.task, unrelated.task, interrupted.task]))
+        #expect(await transport.calls("turn/start").isEmpty)
+        #expect(await journal.load() == [parent, uncertain, unrelated, interrupted])
+        #expect(!ExecutionDeveloperCoordinator.canRequeueWithoutDelivery(uncertain))
+        #expect(!ExecutionDeveloperCoordinator.canRequeueWithoutDelivery(interrupted))
+        await #expect(throws: ExecutionError.self) { try await coordinator.resume(interrupted.key) }
+        #expect(await transport.calls("turn/start").isEmpty)
+        await coordinator.stop()
+    }
+
+    @Test func completedImmediateDependencyCannotHideInterruptedAncestor() async throws {
+        let outcomeID = UUID()
+        var ancestor = ExecutionRecord(key: .init(outcomeID: outcomeID, taskID: "a"), outcome: "Recovery", task: runtimeTask("a"))
+        ancestor.status = .interrupted; ancestor.threadID = "saved-thread"; ancestor.turnID = "saved-turn"
+        var parent = ExecutionRecord(key: .init(outcomeID: outcomeID, taskID: "b"), outcome: "Recovery",
+            task: runtimeTask("b", owner: .quality, dependencies: ["a"]))
+        parent.status = .completed; parent.commitSHA = String(repeating: "b", count: 40)
+        var child = ExecutionRecord(key: .init(outcomeID: outcomeID, taskID: "c"), outcome: "Recovery",
+            task: runtimeTask("c", owner: .interface, dependencies: ["b"]))
+        child.status = .blocked; child.blocker = ExecutionError.dependenciesFailed.localizedDescription
+        let transport = RuntimeTransport(), journal = RuntimeJournal(records: [ancestor, parent, child])
+        let coordinator = runtime(transport, journal: journal)
+        try await coordinator.start()
+        try await coordinator.dispatch(outcomeID: outcomeID, outcome: "Recovery", plan: .init(summary: "Recovery", tasks: [
+            ancestor.task, parent.task, child.task]))
+        #expect(await transport.calls("turn/start").isEmpty)
+        #expect(await journal.load() == [ancestor, parent, child])
+        #expect(await coordinator.snapshot().records.first { $0.key == child.key }?.status == .blocked)
+        // An explicit retry must not acquire a lease or create a worktree while
+        // a completed immediate parent's own ancestor is still unresolved.
+        try await coordinator.resume(child.key)
+        #expect(await transport.calls("turn/start").isEmpty)
+        #expect(await coordinator.snapshot().records.first { $0.key == child.key }?.status == .blocked)
+        await coordinator.stop()
+    }
+
+    @Test func failedRequeueWriteNeverDeliversOrReplacesCancelledIdentity() async throws {
+        let transport = RuntimeTransport(), journal = RuntimeJournal(), coordinator = runtime(transport, journal: journal)
+        try await coordinator.start()
+        try await coordinator.dispatch(outcomeID: UUID(), outcome: "Queued reservation", plan: .init(summary: "Serial owner", tasks: [
+            runtimeTask("a"), runtimeTask("b")]))
+        let waiting = try #require(await coordinator.snapshot().records.first { $0.status == .queued })
+        try await coordinator.cancel(waiting.key)
+        await journal.failWrites()
+        await #expect(throws: ExecutionError.persistenceFailed) { try await coordinator.resume(waiting.key) }
+        let snapshot = await coordinator.snapshot()
+        #expect(!snapshot.connected)
+        #expect(snapshot.records.first { $0.key == waiting.key }?.status == .cancelled)
+        #expect(snapshot.records.first { $0.key == waiting.key }?.id == waiting.id)
+        #expect(await transport.calls("turn/start").count == 1)
+        #expect(await transport.calls("thread/resume").isEmpty)
+        #expect(await journal.load().first { $0.key == waiting.key }?.status == .cancelled)
+        await coordinator.stop()
+    }
+
     @Test func diskJournalPersistsFullTaskAndReceiptForAnotherInstance() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }

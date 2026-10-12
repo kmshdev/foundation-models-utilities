@@ -30,6 +30,7 @@ final class StudioStore {
     @ObservationIgnored private let planner: Planner
     @ObservationIgnored private var subscriptionPlanner: Planner?
     @ObservationIgnored private var planPrepared: (@MainActor (Outcome) -> Void)?
+    @ObservationIgnored private var executionContext: (@MainActor (Outcome) -> String)?
     @ObservationIgnored private var loadStarted = false
     @ObservationIgnored private var planningTask: Task<Void, Never>?
     private var planningQueue: [UUID] = []
@@ -117,6 +118,8 @@ final class StudioStore {
     func configureSubscriptionPlanner(_ planner: @escaping Planner) {
         subscriptionPlanner = planner
     }
+
+    func configureExecutionContext(_ provider: @escaping @MainActor (Outcome) -> String) { executionContext = provider }
 
     func configurePlanPrepared(_ action: @escaping @MainActor (Outcome) -> Void) { planPrepared = action }
 
@@ -248,7 +251,9 @@ final class StudioStore {
                         selectedPlanner = subscriptionPlanner
                     case .disabled: continue
                     }
-                    let result = try await selectedPlanner(outcome.text, [answers, context].joined(separator: "\n"))
+                    let priorPlan = outcome.plan.flatMap { try? JSONEncoder().encode($0) }.map { String(decoding: $0, as: UTF8.self) } ?? "None"
+                    let observed = executionContext?(outcome) ?? "No execution runtime is connected."
+                    let result = try await selectedPlanner(outcome.text, [answers, context, "Prior plan: \(priorPlan)", observed].joined(separator: "\n"))
                     try Task.checkCancellation()
                     guard isPlanningEnabled, contextVersions[outcomeID] == version,
                           !hasUnansweredQuestions(for: outcomeID) else { continue }

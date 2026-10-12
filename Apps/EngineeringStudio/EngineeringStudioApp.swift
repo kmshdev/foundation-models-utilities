@@ -28,6 +28,7 @@ struct EngineeringStudioApp: App {
                         store.cancelPlanning()
                         if runtime.needsAccountDisconnect { await runtime.disconnect() }
                     }
+                    store.configureExecutionContext { outcome in runtime.planningContext(for: outcome) }
                     store.configurePlanPrepared { outcome in runtime.enqueue(outcome, store: store) }
                     store.configureSubscriptionPlanner { outcome, answers in
                         try await FoundationPlanner.subscription(outcome: outcome, answers: answers,

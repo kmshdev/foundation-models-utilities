@@ -234,6 +234,15 @@ final class DeveloperRuntimeConnection: ExecutionRemoteHandler {
         }
     }
 
+    func planningContext(for outcome: Outcome) -> String {
+        let available = state.connected ? state.developers.filter { $0.isAvailable(at: .now) }.map { $0.specialty.title } : []
+        let receipts = state.records.filter { $0.key.outcomeID == outcome.id }.map { record in
+            let commands = record.commands.map { "\($0.command) [exit \($0.exitCode.map(String.init) ?? "unreported")]" }.joined(separator: "; ")
+            return "Task \(record.key.taskID): \(record.status.rawValue). \(record.summary.prefix(2000)) Blocker: \((record.blocker ?? "None").prefix(2000)). Commit: \(record.commitSHA ?? "None"). Commands: \(commands.prefix(2000))."
+        }.joined(separator: "\n")
+        return "Observed available developers: \(available.isEmpty ? "None" : available.joined(separator: ", ")).\nExecution receipts:\n\(receipts.prefix(16000))"
+    }
+
     func hasDelivered(_ outcome: Outcome) -> Bool {
         guard let tasks = outcome.plan?.tasks else { return false }
         return tasks.allSatisfy { task in state.records.contains { $0.key.outcomeID == outcome.id && $0.task == task } }

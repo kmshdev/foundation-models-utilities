@@ -60,7 +60,7 @@ struct TaskDetailView: View {
         }
         .navigationTitle("Task details")
         .onChange(of: task) { _, _ in
-            actionGeneration = UUID(); isActing = false; cancelRequested = false; actionError = nil; publicationError = nil
+            actionGeneration = UUID(); isActing = false; cancelRequested = false; actionError = nil; publicationError = nil; isPublishing = false
         }
         .onChange(of: matchingRecord?.status) { _, status in
             if status != .running { cancelRequested = false }
@@ -152,7 +152,7 @@ struct TaskDetailView: View {
                 detailSection("Pull request", symbol: "arrow.triangle.pull") {
                     Link("Open PR #\(receipt.pullRequestNumber)", destination: receipt.url)
                         .buttonStyle(.glass).controlSize(.large)
-                    Text("Draft · \(receipt.baseBranch)").font(StudioTypography.secondary).foregroundStyle(.secondary)
+                    Text("Created as draft · \(receipt.baseBranch)").font(StudioTypography.secondary).foregroundStyle(.secondary)
                     Text("GitHub commit \(receipt.remoteHeadSHA.prefix(12))")
                         .font(.caption.monospaced()).textSelection(.enabled)
                 }
@@ -160,10 +160,11 @@ struct TaskDetailView: View {
                 Button("Create Draft PR", systemImage: "arrow.triangle.pull") {
                     guard !isPublishing else { return }
                     isPublishing = true; publicationError = nil
+                    let expected = actionGeneration
                     Task {
-                        defer { isPublishing = false }
+                        defer { if actionGeneration == expected { isPublishing = false } }
                         do { _ = try await runtime.publish(record.key) }
-                        catch { publicationError = error.localizedDescription }
+                        catch { if actionGeneration == expected { publicationError = error.localizedDescription } }
                     }
                 }.buttonStyle(.glassProminent).tint(.blue).disabled(isPublishing || !runtime.hasRuntime)
             }
@@ -226,7 +227,8 @@ struct TaskDetailView: View {
         record.status == .queued || (record.status == .running && record.threadID != nil && record.turnID != nil)
     }
     private func canResume(_ record: ExecutionRecord) -> Bool {
-        [.blocked, .cancelled, .interrupted].contains(record.status) && record.threadID != nil && record.worktree != nil
+        ExecutionDeveloperCoordinator.canRequeueWithoutDelivery(record) ||
+            ([.blocked, .cancelled, .interrupted].contains(record.status) && record.threadID != nil && record.worktree != nil)
     }
     private func perform(record: ExecutionRecord, runtime: DeveloperRuntimeConnection, cancel: Bool) {
         guard !isActing else { return }

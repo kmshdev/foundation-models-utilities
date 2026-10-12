@@ -16,7 +16,7 @@ App Sandbox uses user-selected read/write access and app-scoped bookmarks for th
 
 The chat's connectors can read and update project data during this development session. They do not copy credentials into a separately installed app.
 
-- Public GitHub repository/PR/workflow reads need no token. To publish real developer commits and draft PRs, enter a fine-grained GitHub token scoped to `kmshdev/foundation-models-utilities`, with **Contents: Read and write** and **Pull requests: Read and write**, in the host app's Connections. No GitHub administration permission is required. The host keeps this token in Keychain and never sends it to developer shells or the phone.
+- Public GitHub repository/PR/workflow reads need no token. To publish real developer commits and draft PRs, enter a fine-grained GitHub token scoped to `kmshdev/foundation-models-utilities`, with **Contents: Read and write** and **Pull requests: Read and write** (also **Workflows: write** when a task changes workflow files), in the host app's Connections. No GitHub administration permission is required. The host keeps this token in Keychain and never sends it to developer shells or the phone.
 - Enter a Linear personal API key authorized for the ENG team and Engineering Workflow Automation project in Connections to import and publish tasks. The app verifies the fixed project and keeps the key in Keychain. A create reserves its UUID durably before sending and reconciles the same UUID after a lost response.
 - These are app settings. **Do not add personal ChatGPT tokens, GitHub tokens or Linear keys to repository Actions secrets for this runtime.** Native builds and the current validation workflows do not need them.
 

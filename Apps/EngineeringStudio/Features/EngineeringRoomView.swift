@@ -112,7 +112,7 @@ private struct ProposedHandoffView: View {
                     Text(task.owner.displayName).fontWeight(.semibold)
                     Text(record?.task == task && record?.status == .completed ? "· Result" : "· Handoff").foregroundStyle(.secondary)
                 }.font(StudioTypography.secondary)
-                Text(task.handoff).font(StudioTypography.body).lineSpacing(4)
+                Text(record?.task == task && record?.status == .completed ? (record?.summary ?? task.handoff) : task.handoff).font(StudioTypography.body).lineSpacing(4)
                 HStack(spacing: 12) {
                     SymbolBadge(symbol: "doc.text", size: 40)
                     VStack(alignment: .leading, spacing: 4) {

@@ -142,10 +142,27 @@ public actor ExecutionDeveloperCoordinator {
         try await persist(record); await pump()
     }
 
-    /// Continues the saved conversation and worktree, never a fresh clone of
-    /// uncertain work. A completed saved turn is reconciled before another turn.
+    /// A reservation can be retried without a conversation only when the journal
+    /// proves delivery never began. Every turn is preceded by saved thread and
+    /// worktree receipts; missing turn IDs alone do not establish that it is safe.
+    public nonisolated static func canRequeueWithoutDelivery(_ record: ExecutionRecord) -> Bool {
+        [.cancelled, .blocked].contains(record.status) && record.deliveryID == record.id &&
+        record.threadID == nil && record.turnID == nil && record.worktree == nil &&
+        record.receivedHandoffs.isEmpty && record.commands.isEmpty && record.changedPaths.isEmpty &&
+        record.commitSHA == nil && record.result == nil && record.summary.isEmpty
+    }
+
+    /// Requeues a never-delivered reservation, or continues the saved conversation
+    /// and worktree. A completed saved turn is reconciled before another turn;
+    /// uncertain work is never recreated as a fresh execution.
     public func resume(_ key: ExecutionTaskKey) async throws {
         guard connected else { throw ExecutionError.notConnected }
+        guard reservations == 0 else { throw ExecutionError.alreadyRunning }
+        if let record = records[key], Self.canRequeueWithoutDelivery(record) {
+            try await requeue(record)
+            await pump()
+            return
+        }
         guard var record = records[key], [.interrupted, .cancelled, .blocked].contains(record.status),
               let threadID = record.threadID, let worktree = record.worktree else {
             throw ExecutionError.unavailable("This task has no saved conversation and worktree to resume.")
@@ -275,6 +292,17 @@ public actor ExecutionDeveloperCoordinator {
                 try checkLifecycle(expectedLifecycle)
                 try await connect(accessToken: nextToken, resuming: true, expectedLifecycle: expectedLifecycle)
             }
+            // Dependency failures do not consume a child's reserved identity.
+            // Promote only an untouched reservation blocked by this scheduler,
+            // after the entire ancestor chain has produced completed receipts.
+            for record in records.values.filter({ $0.status == .blocked }) {
+                guard connected, lifecycle == expectedLifecycle else { return }
+                guard Self.canRequeueWithoutDelivery(record),
+                      record.blocker == ExecutionError.dependenciesFailed.localizedDescription,
+                      !record.task.dependencies.isEmpty,
+                      (try? handoffRecords(for: record)) != nil else { continue }
+                try await requeue(record)
+            }
             for key in records.values.filter({ $0.status == .queued }).sorted(by: { $0.updatedAt < $1.updatedAt }).map(\.key) {
                 guard connected, lifecycle == expectedLifecycle else { return }
                 guard let record = records[key] else { continue }
@@ -284,8 +312,12 @@ public actor ExecutionDeveloperCoordinator {
                     try await persist(blocked); continue
                 }
                 guard dependencies.count == record.task.dependencies.count,
-                      dependencies.allSatisfy({ $0.status == .completed }),
-                      let date = observed[record.task.owner], Date.now.timeIntervalSince(date) <= 90,
+                      dependencies.allSatisfy({ $0.status == .completed }) else { continue }
+                guard let handoffs = try? handoffRecords(for: record) else {
+                    var blocked = record; blocked.status = .blocked; blocked.blocker = ExecutionError.dependenciesFailed.localizedDescription
+                    try await persist(blocked); continue
+                }
+                guard let date = observed[record.task.owner], Date.now.timeIntervalSince(date) <= 90,
                       Date.now.timeIntervalSince(date) >= 0,
                       !records.values.contains(where: { $0.isActive && $0.task.owner == record.task.owner }) else { continue }
                 let conflict = try records.values.contains { other in
@@ -296,12 +328,22 @@ public actor ExecutionDeveloperCoordinator {
                 // A starting receipt is also the lease, recorded before any worktree or turn I/O.
                 var claimed = record; claimed.status = .starting; claimed.threadID = threads[record.task.owner]
                 try await persist(claimed)
-                await deliver(key, dependencies: try handoffRecords(for: record), expectedLifecycle: expectedLifecycle)
+                await deliver(key, dependencies: handoffs, expectedLifecycle: expectedLifecycle)
             }
         } catch {
             if error is CancellationError, lifecycle != expectedLifecycle { return }
             blocker = safeDescription(error); emit()
         }
+    }
+
+    /// Serialize the durable transition with batch reservations and public resume.
+    /// The old stopped state stays in memory until its write succeeds, so a
+    /// suspended journal cannot expose queued work before it is safely persisted.
+    private func requeue(_ record: ExecutionRecord) async throws {
+        reservations += 1; defer { reservations -= 1 }
+        var queued = record
+        queued.status = .queued; queued.blocker = nil; queued.updatedAt = .now
+        try await persist(queued)
     }
 
     private func deliver(_ key: ExecutionTaskKey, dependencies: [ExecutionRecord], expectedLifecycle: UUID) async {
