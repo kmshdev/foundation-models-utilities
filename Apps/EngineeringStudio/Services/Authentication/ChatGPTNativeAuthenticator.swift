@@ -53,7 +53,7 @@ final class ChatGPTNativeAuthenticator: NSObject, ASWebAuthenticationPresentatio
                 try Task.checkCancellation()
                 guard attemptID == id else { throw ChatGPTAuthenticationError.canceled }
                 // Close the browser after the loopback callback; avoid treating our cancel as user cancellation.
-                let browser = self.browser; self.browser = nil; browser?.cancel()
+                let closingBrowser = self.browser; self.browser = nil; closingBrowser?.cancel()
                 return try await session.completeAuthorization(callbackURL: callback)
             } catch {
                 await session.cancelAuthorization()
@@ -72,7 +72,7 @@ final class ChatGPTNativeAuthenticator: NSObject, ASWebAuthenticationPresentatio
     private func cleanup(endingAttempt: Bool = true) {
         if endingAttempt { attemptID = nil }
         listener?.cancel(); listener = nil
-        let browser = self.browser; self.browser = nil; browser?.cancel()
+        let closingBrowser = self.browser; self.browser = nil; closingBrowser?.cancel()
         #if !os(macOS)
         anchor = nil
         #endif
@@ -82,7 +82,11 @@ final class ChatGPTNativeAuthenticator: NSObject, ASWebAuthenticationPresentatio
         #if os(macOS)
         NSApp.keyWindow ?? NSApp.mainWindow ?? NSWindow()
         #else
-        anchor ?? UIWindow()
+        // signIn validates an active scene window before starting the authentication browser.
+        guard let anchor else {
+            preconditionFailure("Authentication presentation requires the validated active window.")
+        }
+        return anchor
         #endif
     }
 }
