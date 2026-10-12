@@ -18,7 +18,7 @@ The window follows system light/dark appearance, with a continuous neutral backg
 
 Unsent conversation and new-outcome drafts are saved after a short typing pause and restored across relaunch. Closing the creation sheet retains its draft. Accepted outcome/message creation and its draft clearing share one atomic disk snapshot. Pending writes flush on scene inactivity; normal Mac quit waits for a successful flush and leaves the app open if saving fails. Force termination can still interrupt a pending debounce. Messages sent from an outcome are attached to that outcome and supplied as context when preparing its next plan. Legacy messages without an outcome ID remain accessible under All Outcomes, without guessing which thread they belong to. Search finds outcomes. Incoming messages follow the conversation while you are reading its latest content; if you scroll back, a New messages action lets you return without interrupting your reading. Explicit scroll animation respects Reduce Motion. Task selection is cleared when its outcome changes or a replacement plan removes that task. The inspector is keyed by outcome and task, so action feedback cannot carry into another outcome. Earlier execution receipts are grouped as Previous executions whenever they do not match the current assignment.
 
-The Swift-only preview host in `Tools/SwiftUIPreview` compiles the real views, store, model adapter and service clients. Screenshot fixtures do not open account browsers or reach external services. Its regression checks exercise the actual Foundation Models framework with deterministic transport, native cryptography and isolated Keychain records, the loopback listener, service publication and runtime lifecycle. Its screenshots are native UI with fixture data, not evidence of live bot execution. It also typechecks shared UI and both app scene branches against the installed Apple SDKs and runs StudioStore state regression checks; production SDK 27 validation is separate. See the [SwiftUI review](../../Documentation/Design/SwiftUI-review.md) for coverage and release blockers.
+The Swift-only preview host in `Tests/NativePreviewHost` imports the production Swift modules. Screenshot fixtures do not open account browsers or reach external services. Its regression checks exercise the actual Foundation Models framework with deterministic transport, native cryptography and isolated Keychain records, the loopback listener, service publication and runtime lifecycle. Its screenshots are native UI with fixture data. The separate Xcode validation builds both complete application targets; native previews do not prove live bot execution. See the [SwiftUI review](../../Documentation/Design/SwiftUI-review.md) for coverage and release blockers.
 
 You may explicitly enable optional on-device planning in Settings. It uses `LanguageModelSession.DynamicProfile`, the `LanguageModel` protocol, guided generation, typed error handling, and the utilities package's rolling history window. Model tool calling is disabled for this planning-only session. A generated plan is validated before it is saved. Any genuinely blocking questions appear together in the Engineering conversation; partial answers persist and planning waits for all answers in that batch.
 
@@ -34,18 +34,26 @@ Linear is scoped to Engineering Workflow Automation. Use an issue as an outcome 
 
 See [service behavior and failure handling](../../Documentation/Engineering/Service-integrations.md). Connections in this chat do not transfer account tokens into a separately installed app.
 
+The [provider-adapter proposal](../../Documentation/Engineering/Provider-adapters.md) describes system-browser OAuth, provider passkeys, GitHub App registration and Linear MCP dynamic registration. `EngineeringMCP` provides the pinned official Swift SDK transport with reviewed read-only operations and deterministic contract tests. Browser-login controls and workflow-controlled MCP context collection remain proposed; the current Connections UI continues to use its existing credential flow.
+
 ## Repository structure
 
 ```
 EngineeringStudio.xcodeproj/    iOS and macOS application targets and shared schemes
-Apps/EngineeringStudio/        Native app, feature views, state and model integration
-Packages/EngineeringCore/      Swift domain types, validation, persistence and tests
-Sources/                      FoundationModelsUtilities library
-Tests/                        FoundationModelsUtilities tests
-.github/workflows/            Core tests and Apple-platform build checks
+Apps/EngineeringStudio/
+  App/                        Scenes, deep-links, dependency wiring and assets
+  Features/                   Workspace, Settings, Integration and Runtime APIs/views
+  Workflows/                  Planning, publication, dispatch and lifecycle orchestration
+  Services/                   GitHub/Linear, MCP, authentication/model/runtime services
+  Core/                       Leaf contracts, persistence/networking and native UI primitives
+    FoundationModelsUtilities/  Existing utilities library; root package product retained
+  Tests/                      Portable/MCP tests and native regression/capture host
+Package.swift                 FoundationModelsUtilities package manifest
+Tests/                        FoundationModelsUtilities library tests
+.github/workflows/            Swift 6.4 tests and Apple-platform build/capture checks
 ```
 
-The app lives on the default `main` branch of [`kmshdev/foundation-models-utilities`](https://github.com/kmshdev/foundation-models-utilities/tree/main). Both app targets consume FoundationModelsUtilities directly from the root Swift package and EngineeringCore from `Packages/EngineeringCore`. No self-referencing remote package checkout is needed. Run the commands below from the repository root. The earlier TypeScript coordinator PR remains closed and is not part of this branch.
+The app lives in [`kmshdev/foundation-models-utilities`](https://github.com/kmshdev/foundation-models-utilities), whose default branch is `main`. The layered migration is reviewed in [draft PR #2](https://github.com/kmshdev/foundation-models-utilities/pull/2). Both application targets consume the local app package; StudioServices obtains FoundationModelsUtilities from the root package using an explicit local package name. No self-referencing remote checkout is needed. The [module map](../../Documentation/Engineering/Module-architecture.md) explains dependency direction and migration order. Run the commands below from the repository root.
 
 Implementation code in this project is Swift. Use Apple frameworks, Swift packages and documented Apple APIs. Do not introduce TypeScript, JavaScript, Python, Node-based services or a web UI into this project. Cloud preferences do not override the Swift requirement.
 
@@ -54,7 +62,7 @@ Implementation code in this project is Swift. Use Apple frameworks, Swift packag
 Run the portable core tests with Swift 6.4:
 
 ```sh
-swift test --package-path Packages/EngineeringCore
+swift test --package-path Apps/EngineeringStudio --jobs 2
 ```
 
 Build the native targets on a compatible Mac:
@@ -66,7 +74,7 @@ xcodebuild -project EngineeringStudio.xcodeproj -scheme EngineeringStudioMac \
   -destination 'generic/platform=macOS' CODE_SIGNING_ALLOWED=NO build
 ```
 
-The core tests cover Apple-style path collisions, unsafe paths, overlapping scope, ordered and cyclic handoffs, partial question batches, heartbeat freshness, disk round trips, stale writes, schema errors, and corrupt-file preservation. They do not establish SwiftUI correctness or real model behavior. CI fails explicitly when the required Apple SDK/compiler is unavailable; it does not silently lower the target platform.
+Portable tests cover Apple-style path collisions, unsafe paths, overlapping scope, ordered and cyclic handoffs, partial question batches, heartbeat freshness, disk round trips, stale writes, schema errors, corrupt-file preservation and deep-link parsing. MCP fixtures cover negotiation, bounded catalogs/results, reviewed schemas and arguments, structured receipts, errors, timeout and cancellation. Linux tests do not establish SwiftUI correctness, Apple streaming/OAuth or real model behavior. CI fails explicitly when the required Apple SDK/compiler is unavailable; it does not silently lower the target platform.
 
 ## ChatGPT and developer execution
 

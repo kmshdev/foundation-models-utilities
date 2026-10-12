@@ -147,7 +147,7 @@ public actor EngineeringMCPClient {
         return catalog
     }
 
-    private func performRequest<Operation: Method>(
+    private func performRequest<Operation: MCP.Method>(
         _ request: Request<Operation>
     ) async throws -> Operation.Result {
         // The ID exists before any SDK actor hop. One deadline covers request setup,

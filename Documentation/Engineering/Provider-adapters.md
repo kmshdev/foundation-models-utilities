@@ -19,9 +19,9 @@ This draft adds a shared read-only MCP transport under `EngineeringMCP`; SDK ini
 | Adapter | Proposed login and registration | Credentials and boundaries |
 | --- | --- | --- |
 | GitHub REST | Register a GitHub App; configure the app callback; authorize through the system browser with state and S256 PKCE; install the app on the selected repository. | GitHub's code exchange requires client ID and client secret, even with PKCE. Use a user access token. Public native clients cannot keep the app secret confidential; see the caveat below. No app private key is required for this flow. |
-| GitHub remote MCP | Connect to `https://api.githubcopilot.com/mcp/` using the host's registered GitHub App or OAuth App authorization. | GitHub documents host-owned registration. Its live metadata advertises no dynamic registration endpoint. PAT authentication remains a fallback. MCP tool filtering does not establish a repository boundary. |
+| GitHub remote MCP | Connect to `https://api.githubcopilot.com/mcp/` using the host's registered GitHub App or OAuth App authorization. | GitHub documents host-owned registration. Its live metadata advertises no dynamic registration endpoint. The read client also sends `X-MCP-Readonly: true`; that catalog mode does not establish a repository boundary. PAT authentication remains a fallback. |
 | Linear GraphQL | Register a Linear OAuth application and exact callback; use system-browser authorization code with state and S256 PKCE, initially as the user. | Client ID is required. Client secret is optional for PKCE code exchange and refresh. Read/update scopes apply to accessible account data; enforce the project's UUID in the adapter. |
-| Linear remote MCP | Connect to `https://mcp.linear.app/mcp`; discover authorization metadata and register a public client through the documented OAuth 2.1/DCR flow. | A manually created Linear OAuth application is not required for this DCR path. Existing Linear OAuth tokens or API keys are also accepted as Bearer credentials. Keep authentication separate per workspace. |
+| Linear remote MCP | Use the documented read-only endpoint `https://mcp.linear.app/mcp/readonly`; discover authorization metadata and register a public client through the documented OAuth 2.1/DCR flow. | A manually created Linear OAuth application is not required for this DCR path. The SDK accepts matching parent `/mcp` protected-resource metadata for this endpoint. Existing Linear OAuth tokens or API keys are also accepted as Bearer credentials. Keep authentication separate per workspace. |
 
 Passkey login and OAuth consent are complementary: the passkey proves the person's identity to the provider, and the resulting grant authorizes Engineering Studio. Both [GitHub](https://docs.github.com/en/authentication/authenticating-with-a-passkey/signing-in-with-a-passkey) and [Linear](https://linear.app/docs/login-methods#passkey) document passkeys. Offer “Connect GitHub” and “Connect Linear”; let the provider choose its login method instead of promising a passkey-only flow.
 
@@ -98,12 +98,12 @@ flowchart TD
 ```
 
 - **Core:** value models, service scope, persistence primitives, networking contracts, reusable native UI and Foundation Models utilities.
-- **Services:** provider authentication/token storage, typed GitHub/Linear adapters, model transport, runtime connections and the shared MCP transport. `EngineeringMCP` does not own UI or cross-service workflow policy.
+- **Services:** provider authentication/token storage, typed GitHub/Linear adapters, model transport, runtime transport infrastructure and the shared MCP transport. `EngineeringMCP` does not own UI or cross-service workflow policy.
 - **Workflows:** plan-context collection, ticket publication/reconciliation, developer dispatch, handoffs and test/PR evidence orchestration. They combine services and return domain results.
 - **Features:** workspace, settings, integrations and runtime experiences with public entry points. Feature-to-feature use goes through the exposed API rather than another feature's implementation internals.
 - **App:** scenes, deep-links and dependency composition; it does not implement provider business rules.
 
-Migrate leaf modules first, preserve their tests and package product boundaries, then move services, workflows, feature APIs/implementations and finally app composition. Keep the compatibility package used by portable checks while its sources become app-owned. Avoid creating another parallel implementation during migration.
+Migrate leaf modules first, preserve their tests and public product boundaries, then move services, workflows, feature APIs/implementations and finally app composition. Portable checks now use the app-owned package; the root FoundationModelsUtilities package retains its public product with an explicit source path. See the [module map](Module-architecture.md) for the implemented graph.
 
 ## Evidence and remaining validation
 

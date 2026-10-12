@@ -8,7 +8,7 @@ The default `main` branch contains the native engineering app and the Foundation
 - Prefer Apple frameworks and Swift packages. Cloudflare is a hosting preference only when compatible with the Swift implementation requirement; research the supported developer path rather than adding a non-Swift service.
 - Preserve the eight confirmed specialties and priority order. Batch genuinely blocking questions, retain answers, and wait before dependent work. Do not reintroduce removed routine approval checkpoints.
 - Never claim developers are available without actual presence, that a plan was dispatched without delivery, or that a test/PR exists without evidence. Personal ChatGPT subscription access must use a documented, supported integration; an API key is not a subscription and authentication must not be coupled to a Mac runner.
-- Validate portable logic with `swift test --package-path Packages/EngineeringCore`. Validate application targets with Xcode and the required Apple SDKs. Linux core tests and syntax checks do not establish a runnable native app.
+- Validate portable logic and MCP contracts with `swift test --package-path Apps/EngineeringStudio --jobs 2`. Validate application targets with Xcode and the required Apple SDKs. Linux tests and syntax checks do not establish a runnable native app.
 
 ## Project structure
 
