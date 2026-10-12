@@ -4,8 +4,8 @@ on:
     branches: [main]
     paths:
       - 'Apps/EngineeringStudio/**'
-      - 'Packages/EngineeringCore/Sources/**'
       - 'Tools/SwiftUIPreview/**'
+      - 'Package.swift'
       - '.github/workflows/screenshots.yml'
   workflow_dispatch:
 permissions:
