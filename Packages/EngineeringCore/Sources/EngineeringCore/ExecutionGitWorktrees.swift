@@ -73,7 +73,7 @@ public actor ExecutionGitWorktrees: ExecutionWorktreeManaging {
         _ = try await git(["--literal-pathspecs", "add", "--"] + paths, at: worktree.url)
         let staged = try await git(["diff", "--cached", "--name-only", "-z"], at: worktree.url)
         if !staged.isEmpty {
-            _ = try await git(["-c", "core.hooksPath=/dev/null", "commit", "-m", "Engineering task: \(task.title)"], at: worktree.url)
+            _ = try await git(["commit", "-m", "Engineering task: \(task.title)"], at: worktree.url)
         }
         let commit = try await git(["rev-parse", "HEAD"], at: worktree.url).trimmingCharacters(in: .whitespacesAndNewlines)
         try validateSHA(commit)
@@ -90,7 +90,17 @@ public actor ExecutionGitWorktrees: ExecutionWorktreeManaging {
         let executable = gitURL
         return try await Task { @concurrent in
             let process = Process(), output = Pipe()
-            process.executableURL = executable; process.arguments = arguments
+            process.executableURL = executable
+            // Sandboxed apps need no identity in the user's home directory.
+            // These command-only settings also make commits and cherry-picks
+            // noninteractive while Git retains each dependency's original author.
+            process.arguments = [
+                "-c", "user.name=Engineering Studio",
+                "-c", "user.email=engineering-studio@localhost",
+                "-c", "commit.gpgsign=false",
+                "-c", "core.hooksPath=/dev/null",
+                "-c", "core.fsmonitor=false"
+            ] + arguments
             process.currentDirectoryURL = directory
             process.standardOutput = output; process.standardError = FileHandle.nullDevice
             // Git commands are local; discard ambient tokens and disable prompts/hooks.
@@ -98,9 +108,6 @@ public actor ExecutionGitWorktrees: ExecutionWorktreeManaging {
                 ["PATH", "HOME", "LANG", "LC_ALL", "TMPDIR", "USER", "LOGNAME"].contains($0.key)
             }
             environment["GIT_TERMINAL_PROMPT"] = "0"
-            environment["GIT_CONFIG_COUNT"] = "1"
-            environment["GIT_CONFIG_KEY_0"] = "core.hooksPath"
-            environment["GIT_CONFIG_VALUE_0"] = "/dev/null"
             process.environment = environment
             try process.run()
             let data = output.fileHandleForReading.readDataToEndOfFile()

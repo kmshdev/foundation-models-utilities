@@ -10,6 +10,8 @@ The application and bridge implementation are Swift. This is an operational guid
 4. Connect developers. Eight actual app-server conversations provide presence. Roles in configuration alone do not count as connected or available.
 5. Prepare an outcome's plan. New plans run automatically while connected; an existing saved plan has a Run Team action. Worktrees, receipts and interrupted work persist in Application Support.
 
+App-owned Git commands set the bot identity `Engineering Studio <engineering-studio@localhost>` for that invocation and disable signing, hooks and fsmonitor. Dependency authors are preserved; global/repository Git settings are never changed. This allows scoped commits even when the app container has no user Git identity.
+
 App Sandbox uses user-selected read/write access and app-scoped bookmarks for the clone. The chosen CLI's security scope is held while it is copied. Git worktrees and model/session state live in the app container. Native Mac execution under a signed sandboxed distribution still needs operational validation with that user's installed CLI and build tools.
 
 ## GitHub and Linear credentials

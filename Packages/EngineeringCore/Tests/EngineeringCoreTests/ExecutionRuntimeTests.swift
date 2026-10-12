@@ -565,6 +565,26 @@ private func waitFor(_ runtime: ExecutionDeveloperCoordinator, _ predicate: @Sen
         try runGit(["add", "."], at: repository)
         try runGit(["commit", "-m", "Initial"], at: repository)
         try runGit(["remote", "add", "origin", "https://github.com/\(ServiceScope.repository).git"], at: repository)
+        let initialBranch = try runGit(["symbolic-ref", "--short", "HEAD"], at: repository).trimmingCharacters(in: .whitespacesAndNewlines)
+        try runGit(["checkout", "-b", "fixture-dependency"], at: repository)
+        try "dependency\n".write(to: repository.appendingPathComponent("Dependency.swift"), atomically: true, encoding: .utf8)
+        try runGit(["add", "Dependency.swift"], at: repository)
+        try runGit(["-c", "user.name=Dependency Author", "-c", "user.email=dependency@example.invalid", "commit", "-m", "Dependency implementation"], at: repository)
+        let dependencyCommit = try runGit(["rev-parse", "HEAD"], at: repository).trimmingCharacters(in: .whitespacesAndNewlines)
+        try runGit(["checkout", initialBranch], at: repository)
+        try runGit(["config", "--unset", "user.name"], at: repository)
+        try runGit(["config", "--unset", "user.email"], at: repository)
+        try runGit(["config", "commit.gpgsign", "true"], at: repository)
+        try runGit(["config", "gpg.program", "/nonexistent/engineering-test-gpg"], at: repository)
+        let hooks = directory.appendingPathComponent("hooks", isDirectory: true)
+        try FileManager.default.createDirectory(at: hooks, withIntermediateDirectories: true)
+        let hook = hooks.appendingPathComponent("pre-commit")
+        try "#!/bin/sh\nexit 7\n".write(to: hook, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: hook.path)
+        try runGit(["config", "core.hooksPath", hooks.path], at: repository)
+        try runGit(["config", "core.fsmonitor", hook.path], at: repository)
+        let originalConfiguration = try Data(contentsOf: repository.appendingPathComponent(".git/config"))
+        let originalHead = try runGit(["rev-parse", "HEAD"], at: repository)
         let manager = ExecutionGitWorktrees(repositoryURL: repository, worktreeDirectory: worktrees)
         let tree = try await manager.prepare(executionID: UUID(), dependencyCommits: [])
         try "changed\n".write(to: tree.url.appendingPathComponent("Owned.swift"), atomically: true, encoding: .utf8)
@@ -573,6 +593,8 @@ private func waitFor(_ runtime: ExecutionDeveloperCoordinator, _ predicate: @Sen
         #expect(receipt.commitSHA != nil)
         #expect(try String(contentsOf: repository.appendingPathComponent("Owned.swift"), encoding: .utf8) == "initial\n")
         let firstCommit = try #require(receipt.commitSHA)
+        #expect(try runGit(["show", "-s", "--format=%an <%ae>%n%cn <%ce>", firstCommit], at: tree.url) ==
+            "Engineering Studio <engineering-studio@localhost>\nEngineering Studio <engineering-studio@localhost>\n")
         let next = try await manager.prepare(executionID: UUID(), dependencyCommits: [firstCommit])
         try "second\n".write(to: next.url.appendingPathComponent("Second.swift"), atomically: true, encoding: .utf8)
         let secondReceipt = try await manager.verifyAndCommit(task: runtimeTask("b", path: "Second.swift"), worktree: next)
@@ -580,6 +602,12 @@ private func waitFor(_ runtime: ExecutionDeveloperCoordinator, _ predicate: @Sen
         let receiver = try await manager.prepare(executionID: UUID(), dependencyCommits: [firstCommit, secondCommit, firstCommit])
         #expect(try String(contentsOf: receiver.url.appendingPathComponent("Owned.swift"), encoding: .utf8) == "changed\n")
         #expect(try String(contentsOf: receiver.url.appendingPathComponent("Second.swift"), encoding: .utf8) == "second\n")
+        let authoredDependency = try await manager.prepare(executionID: UUID(), dependencyCommits: [dependencyCommit])
+        #expect(try String(contentsOf: authoredDependency.url.appendingPathComponent("Dependency.swift"), encoding: .utf8) == "dependency\n")
+        #expect(try runGit(["show", "-s", "--format=%an <%ae>%n%cn <%ce>", "HEAD"], at: authoredDependency.url) ==
+            "Dependency Author <dependency@example.invalid>\nEngineering Studio <engineering-studio@localhost>\n")
+        #expect(try Data(contentsOf: repository.appendingPathComponent(".git/config")) == originalConfiguration)
+        #expect(try runGit(["rev-parse", "HEAD"], at: repository) == originalHead)
         let rejected = try await manager.prepare(executionID: UUID(), dependencyCommits: [])
         try "outside".write(to: rejected.url.appendingPathComponent("Other.swift"), atomically: true, encoding: .utf8)
         await #expect(throws: ExecutionError.scopeViolation(["Other.swift"])) {
@@ -587,12 +615,18 @@ private func waitFor(_ runtime: ExecutionDeveloperCoordinator, _ predicate: @Sen
         }
     }
 
-    private func runGit(_ arguments: [String], at directory: URL) throws {
+    @discardableResult
+    private func runGit(_ arguments: [String], at directory: URL) throws -> String {
         let process = Process(); process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
-        process.arguments = arguments; process.currentDirectoryURL = directory
-        process.standardOutput = FileHandle.nullDevice; process.standardError = FileHandle.nullDevice
-        try process.run(); process.waitUntilExit()
+        process.arguments = ["-c", "commit.gpgsign=false", "-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false"] + arguments
+        process.currentDirectoryURL = directory
+        let output = Pipe()
+        process.standardOutput = output; process.standardError = FileHandle.nullDevice
+        try process.run()
+        let data = output.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
         #expect(process.terminationStatus == 0)
+        return try #require(String(data: data, encoding: .utf8))
     }
 }
 
