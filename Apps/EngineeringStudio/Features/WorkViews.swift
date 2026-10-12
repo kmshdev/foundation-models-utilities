@@ -3,32 +3,37 @@ import SwiftUI
 
 struct TeamView: View {
     var runtime: DeveloperRuntimeConnection = DeveloperRuntimeConnection()
+    @Environment(\.dynamicTypeSize) private var dynamicType
+
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
-                StudioHeading(eyebrow: "Team / 03", title: "Eight distinct disciplines.",
-                              detail: runtime.status)
-                HStack { Label("8 specialties", systemImage: "person.3"); Spacer(); Label(runtime.status, systemImage: "terminal") }.font(.caption).foregroundStyle(.secondary)
-                ForEach(Specialty.allCases) { specialty in
-                    HStack(alignment: .top, spacing: 18) {
-                        Image(systemName: specialty.symbol).font(.title2).foregroundStyle(.secondary)
-                            .frame(width: 30).accessibilityHidden(true)
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(specialty.title).font(.headline)
-                            Text(presenceDescription(specialty)).font(.caption.monospaced()).foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: StudioSpacing.medium) {
+                    Text("Developers").font(StudioTypography.title).accessibilityAddTraits(.isHeader)
+                    if dynamicType.isAccessibilitySize {
+                        VStack(alignment: .leading, spacing: StudioSpacing.small) { specialties; connectionStatus }
+                    } else {
+                        ViewThatFits(in: .horizontal) {
+                            HStack(spacing: StudioSpacing.standard) { specialties; connectionStatus }
+                            VStack(alignment: .leading, spacing: StudioSpacing.small) { specialties; connectionStatus }
                         }
-                        Spacer(minLength: 0)
-                    }.padding(.vertical, 24).overlay(alignment: .bottom) { Divider() }
+                    }
+                }.padding(.vertical, StudioSpacing.medium)
+                ForEach(Specialty.allCases) { specialty in
+                    TeamMemberRow(specialty: specialty, connected: runtime.state.connected,
+                                  presence: runtime.state.developers.first { $0.specialty == specialty })
                 }
-            }.padding(24).frame(maxWidth: 840).frame(maxWidth: .infinity)
+            }.padding(StudioSpacing.section).frame(maxWidth: 840).frame(maxWidth: .infinity)
         }.background(StudioStyle.paper).navigationTitle("Team")
     }
-    private func presenceDescription(_ specialty: Specialty) -> String {
-        guard runtime.state.connected, let presence = runtime.state.developers.first(where: { $0.specialty == specialty }) else {
-            return "Offline · No developer connected"
-        }
-        if presence.isAvailable(at: .now) { return "Available" }
-        if presence.activeTask != nil { return "Working" }
-        return "Presence needs refresh"
+
+    private var specialties: some View {
+        Label("\(Specialty.allCases.count) specialties", systemImage: "person.3")
+            .font(StudioTypography.secondary).foregroundStyle(.secondary)
+    }
+    private var connectionStatus: some View {
+        Label(runtime.status, systemImage: "terminal")
+            .font(StudioTypography.secondary).foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }

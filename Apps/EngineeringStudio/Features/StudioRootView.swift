@@ -1,14 +1,6 @@
 import EngineeringCore
 import SwiftUI
 
-private enum WorkspaceDestination: Hashable {
-    case all, needsInput, outcome(UUID)
-}
-private enum StudioSheet: String, Identifiable {
-    case newOutcome, team, settings, connections, runtime
-    var id: Self { self }
-}
-
 struct StudioRootView: View {
     let store: StudioStore
     let connections: ServiceConnections
@@ -24,6 +16,9 @@ struct StudioRootView: View {
     @State private var compactColumn: NavigationSplitViewColumn = .sidebar
     @State private var sheet: StudioSheet?
     @State private var search = ""
+    #if os(macOS)
+    @State private var showsSidebar = true
+    #endif
 
     /// One-time selection seeds for self-contained SwiftUI previews.
     init(store: StudioStore, connections: ServiceConnections = ServiceConnections(), chatGPT: ChatGPTConnection = ChatGPTConnection(),
@@ -78,13 +73,16 @@ struct StudioRootView: View {
             #if os(macOS)
             ToolbarItem(placement: .navigation) {
                 HStack(spacing: 12) {
+                    Button("Toggle sidebar", systemImage: "sidebar.left") { showsSidebar.toggle() }
+                        .labelStyle(.iconOnly).keyboardShortcut("s", modifiers: [.command, .control])
                     SymbolBadge(symbol: "doc.text", size: 40)
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(outcome.map { String($0.text.prefix(45)) } ?? "Engineering")
-                            .font(.system(size: 18, weight: .semibold))
+                        Text(outcome?.text ?? "Engineering")
+                            .font(.headline).lineLimit(1).help(outcome?.text ?? "Engineering")
                         Text("Engineering").font(StudioTypography.secondary).foregroundStyle(.secondary)
                     }
-                }.padding(.leading, 116)
+                    .frame(maxWidth: 280, alignment: .leading)
+                }
             }.sharedBackgroundVisibility(.hidden)
             ToolbarSpacer(.flexible, placement: .primaryAction)
             ToolbarItem(placement: .primaryAction) {
@@ -104,22 +102,15 @@ struct StudioRootView: View {
                         .buttonStyle(.plain)
                         .keyboardShortcut("n", modifiers: .command)
                         .accessibilityLabel("New outcome").help("Start a new outcome").disabled(!store.isLoaded)
-                        Button {
-                            if store.isPlanning { store.cancelPlanning() }
-                            else { Task { do { _ = try await runtime.stop() } catch { runtime.reportError(error) } } }
-                        } label: {
-                            Label(store.isPlanning ? "Cancel Planning" : "Pause Team",
-                                  systemImage: store.isPlanning ? "stop.fill" : "pause.fill")
-                                .font(.system(size: 15, weight: .medium)).padding(.horizontal, 6).frame(height: 28)
-                        }
-                        .labelStyle(.titleAndIcon)
-                        .buttonStyle(.glass).tint(.orange).disabled(!store.isPlanning && !runtime.state.connected)
-                        .help(store.isPlanning ? "Cancel planning" : "Stop developer turns and retain their context")
+                        DeveloperTeamControl(runtime: runtime) { sheet = .runtime }
                         Menu {
                             Button("Developers", systemImage: "person.2") { sheet = .team }
                             Button("Connections", systemImage: "link") { sheet = .connections }
                             Button("Developer runtime", systemImage: "terminal") { sheet = .runtime }
                             Button("Settings", systemImage: "gearshape") { openSettings() }
+                            if store.isPlanning {
+                                Button("Cancel Planning", systemImage: "stop.fill") { store.cancelPlanning() }
+                            }
                         } label: {
                             Image(systemName: "ellipsis").font(.system(size: 18)).frame(width: 40, height: 40)
                         }
@@ -168,8 +159,10 @@ struct StudioRootView: View {
                     Button("Settings", systemImage: "gearshape") { sheet = .settings }
                     if runtime.state.connected {
                         Button("Pause Team", systemImage: "pause.fill") { Task { do { _ = try await runtime.stop() } catch { runtime.reportError(error) } } }
+                            .disabled(runtime.isControlling || runtime.isDisconnecting)
                     } else if runtime.hasRuntime {
                         Button("Restart developers", systemImage: "play.fill") { Task { do { _ = try await runtime.restart() } catch { runtime.reportError(error) } } }
+                            .disabled(runtime.isControlling || runtime.isConnecting || runtime.isDisconnecting)
                     }
                     if store.isPlanning {
                         Button("Cancel Planning", systemImage: "stop.fill") { store.cancelPlanning() }
@@ -182,8 +175,9 @@ struct StudioRootView: View {
     @ViewBuilder private var workspaceColumns: some View {
         #if os(macOS)
         HSplitView {
-            sidebar
-                .frame(minWidth: 220, idealWidth: 258, maxWidth: 258)
+            if showsSidebar {
+                sidebar.frame(minWidth: 220, idealWidth: 258, maxWidth: 258)
+            }
             conversationColumn
                 .frame(minWidth: 430, idealWidth: 610, maxWidth: .infinity)
                 .padding(.horizontal, 10)
@@ -220,7 +214,14 @@ struct StudioRootView: View {
                 }
             } else if let outcome {
                 EngineeringRoomView(store: store, connections: connections, runtime: runtime, outcome: outcome, selectedTaskID: selectedTaskID,
-                                    initialDraft: initialDraft, openConnections: { sheet = .connections }) { taskID in
+                                    initialDraft: initialDraft, openConnections: { sheet = .connections },
+                                    openSettings: {
+                                        #if os(macOS)
+                                        openSettings()
+                                        #else
+                                        sheet = .settings
+                                        #endif
+                                    }, openRuntime: { sheet = .runtime }) { taskID in
                     selectedTaskID = taskID
                     // A repeated selection must reopen the detail after Back,
                     // even when the highlighted task ID hasn't changed.
@@ -235,8 +236,7 @@ struct StudioRootView: View {
     private var detailColumn: some View {
         Group {
             if let selectedTask, let outcome {
-                TaskDetailView(task: selectedTask, issueBinding: store.issueBinding(outcomeID: outcome.id, taskID: selectedTask.id),
-                               record: runtime.record(outcomeID: outcome.id, taskID: selectedTask.id), runtime: runtime)
+                TaskInspectorColumn(task: selectedTask, outcomeID: outcome.id, store: store, runtime: runtime)
             }
             else {
                 ContentUnavailableView("Select a task", systemImage: "sidebar.right",
@@ -248,6 +248,28 @@ struct StudioRootView: View {
     }
 
     private var sidebar: some View {
+        Group {
+        #if os(macOS)
+        List(selection: $destination) {
+            Section("Engineering") {
+                Label("All outcomes", systemImage: "rectangle.stack").tag(WorkspaceDestination.all)
+                HStack {
+                    Label("Needs input", systemImage: "bubble.left")
+                    Spacer()
+                    if !pendingIDs.isEmpty { Text(pendingIDs.count, format: .number).foregroundStyle(.secondary) }
+                }.tag(WorkspaceDestination.needsInput)
+            }
+            Section("Outcomes") {
+                ForEach(store.workspace.outcomes.reversed()) { item in
+                    Label(item.text, systemImage: "doc.text").lineLimit(2).tag(WorkspaceDestination.outcome(item.id))
+                }
+                Button("New outcome", systemImage: "square.and.pencil") { sheet = .newOutcome }
+                    .disabled(!store.isLoaded)
+            }
+            Section("Team") { developerSidebarButton }
+        }
+        .listStyle(.sidebar).scrollContentBackground(.hidden)
+        #else
         ScrollView {
             VStack(alignment: .leading, spacing: 5) {
                 sidebarHeading("Engineering")
@@ -258,25 +280,29 @@ struct StudioRootView: View {
                 ForEach(store.workspace.outcomes.reversed()) { item in
                     destinationRow(item.text, symbol: "doc.text", value: .outcome(item.id))
                 }
+                Button("New outcome", systemImage: "square.and.pencil") { sheet = .newOutcome }
+                    .frame(minHeight: 44).padding(.horizontal, 14).disabled(!store.isLoaded)
+                if store.workspace.outcomes.isEmpty {
+                    Text("Give the team an outcome or import tickets from Connections.")
+                        .font(StudioTypography.caption).foregroundStyle(.secondary)
+                        .padding(.horizontal, 14).padding(.bottom, 8)
+                }
                 Divider().padding(.horizontal, 12).padding(.vertical, 13)
                 sidebarHeading("Team")
-                Button { sheet = .team } label: {
-                    HStack(spacing: 14) {
-                        Image(systemName: "person.2").font(.system(size: 22)).frame(width: 26)
-                        VStack(alignment: .leading, spacing: 7) {
-                            Text("Developers").fixedSize(horizontal: true, vertical: false)
-                            Label(runtime.state.connected ? "\(runtime.availableCount) available" : "Offline", systemImage: runtime.state.connected ? "circle.fill" : "circle").font(StudioTypography.caption).foregroundStyle(.secondary).lineLimit(1)
-                        }.layoutPriority(1)
-                        Spacer(minLength: 0)
-                        Text(Specialty.allCases.count, format: .number).foregroundStyle(.secondary)
-                        Image(systemName: "chevron.right").font(StudioTypography.caption).foregroundStyle(.secondary)
-                    }.padding(.horizontal, 14).padding(.vertical, 12).contentShape(.rect)
-                }.buttonStyle(.plain)
+                developerSidebarButton.padding(.horizontal, 14).padding(.vertical, 12)
             }.padding(.horizontal, 8).padding(.top, 16)
+        }
+        #endif
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .modifier(WorkspacePanel())
         .navigationTitle("Engineering")
+    }
+
+    private var developerSidebarButton: some View {
+        Button { sheet = .team } label: {
+            TeamAvailabilityLabel(runtime: runtime)
+        }.buttonStyle(.plain)
     }
 
     private func sidebarHeading(_ text: String) -> some View {
@@ -345,64 +371,6 @@ struct StudioRootView: View {
                     }
                     .buttonStyle(.glassProminent).controlSize(.large).disabled(!store.isLoaded)
                 }
-            }
-        }
-    }
-}
-
-private struct StudioSheetView: View {
-    let kind: StudioSheet
-    let store: StudioStore
-    let connections: ServiceConnections
-    let chatGPT: ChatGPTConnection
-    let runtime: DeveloperRuntimeConnection
-    @Environment(\.dismiss) private var dismiss
-    var body: some View {
-        NavigationStack {
-            Group {
-                switch kind {
-                case .newOutcome: NewOutcomeView(store: store)
-                case .team: TeamView(runtime: runtime)
-                case .settings: StudioSettingsView(store: store, connections: connections, chatGPT: chatGPT, runtime: runtime)
-                case .connections: ServiceConnectionsView(connections: connections, store: store)
-                case .runtime: DeveloperRuntimeView(runtime: runtime, account: chatGPT)
-                }
-            }
-            .toolbar {
-                if kind != .newOutcome {
-                    ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
-                }
-            }
-        }
-        #if os(macOS)
-        .frame(minWidth: 520, idealWidth: 620, minHeight: 480, idealHeight: 620)
-        #endif
-    }
-}
-
-private struct NewOutcomeView: View {
-    let store: StudioStore
-    @Environment(\.dismiss) private var dismiss
-    @State private var text = ""
-    var body: some View {
-        Form {
-            Section("Shared outcome") {
-                TextField("What should the team accomplish?", text: $text, axis: .vertical)
-                    .lineLimit(4...10)
-            }
-            Section("Workspace") {
-                LabeledContent("Repository", value: "kmshdev/foundation-models-utilities")
-                LabeledContent("Project", value: "Engineering Workflow Automation")
-            }
-        }
-        .formStyle(.grouped)
-        .navigationTitle("New outcome")
-        .interactiveDismissDisabled(!text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Create") { if store.submit(text) { dismiss() } }
-                    .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !store.isLoaded)
             }
         }
     }

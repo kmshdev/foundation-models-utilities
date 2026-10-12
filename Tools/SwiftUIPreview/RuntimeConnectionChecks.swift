@@ -35,6 +35,7 @@ func checkDeveloperRuntimeConnection() async throws {
     try runtimeRequire(transport.requests.count == beforeSecondConnect &&
                        runtime.remoteOrigin == "https://runtime-fixture.example.invalid",
                        "Single backend rejects an overlapping remote connection")
+    try await runtimeCheckSnapshotControlOrdering(runtime, transport: transport)
 
     transport.pauseNextSnapshot = true
     let refreshing = Task { @MainActor in await runtime.refresh() }
@@ -79,7 +80,118 @@ func checkDeveloperRuntimeConnection() async throws {
                                 accessID: "", accessSecret: "")
     try await runtimeCheckIndependentPhoneAccount(runtime, transport: transport)
     await runtime.disconnect()
-    print("Developer runtime connection checks passed: single backend, stale refresh rejection, failed remote stop, serialized shutdown and phone/host account isolation.")
+    print("Developer runtime connection checks passed: single backend, stale read/delivery rejection, serialized pause/restart, failed-read retention, serialized shutdown and phone/host account isolation.")
+}
+
+@MainActor
+private func runtimeCheckSnapshotControlOrdering(_ runtime: DeveloperRuntimeConnection,
+                                                transport: RuntimeCheckTransport) async throws {
+    let task = WorkTask(id: "intake", title: "Outcome intake", owner: .interface,
+                        paths: ["Apps/EngineeringStudio/Features/OutcomeComposer.swift"],
+                        acceptance: ["Accept a shared outcome"], dependencies: [], handoff: "Share the intake contract.")
+    let request = ExecutionRemoteDispatch(outcomeID: UUID(), outcome: "Build outcome intake",
+                                          plan: .init(summary: "Scoped intake", tasks: [task]))
+    transport.records = [.init(key: .init(outcomeID: request.outcomeID, taskID: task.id),
+                               outcome: request.outcome, task: task)]
+    await runtime.refresh()
+    let retained = runtime.state.records
+    transport.failSnapshot = true
+    await runtime.refresh()
+    try runtimeRequire(!runtime.remoteReachable && !runtime.state.connected && runtime.connectedCount == 0 &&
+                       runtime.availableCount == 0 && runtime.state.records == retained && runtime.error != nil,
+                       "A failed manual read clears availability and retains prior execution receipts")
+    transport.failSnapshot = false
+    await runtime.refresh()
+    try runtimeRequire(runtime.remoteReachable && runtime.state.connected && runtime.error == nil,
+                       "A successful read recovers reachability without replacing the backend")
+
+    transport.pauseNextCancel = true
+    let cancelling = Task { @MainActor in try await runtime.cancel(retained[0].key) }
+    try await transport.waitForCancelGate()
+    transport.pauseNextSnapshot = true
+    let midCancelRead = Task { @MainActor in await runtime.refresh() }
+    try await transport.waitForSnapshotGate()
+    transport.releaseCancel()
+    _ = try await cancelling.value
+    transport.releaseSnapshot()
+    await midCancelRead.value
+    try runtimeRequire(runtime.state.records.first?.status == .cancelled,
+                       "A read begun during cancellation cannot undo the acknowledged task status")
+    transport.records = retained
+    await runtime.refresh()
+
+    transport.pauseNextSnapshot = true
+    let prePauseRead = Task { @MainActor in await runtime.refresh() }
+    try await transport.waitForSnapshotGate()
+    _ = try await runtime.stop()
+    transport.releaseSnapshot()
+    await prePauseRead.value
+    try runtimeRequire(!runtime.state.connected && !runtime.isControlling && runtime.hasRuntime && runtime.isRemote,
+                       "A pre-Pause snapshot cannot resurrect stopped developers or lose the configured remote backend")
+
+    transport.pauseNextSnapshot = true
+    let preRestartRead = Task { @MainActor in await runtime.refresh() }
+    try await transport.waitForSnapshotGate()
+    _ = try await runtime.restart()
+    transport.releaseSnapshot()
+    await preRestartRead.value
+    try runtimeRequire(runtime.state.connected && !runtime.isControlling,
+                       "A pre-Restart offline snapshot cannot undo acknowledged developer startup")
+
+    transport.pauseNextStop = true
+    let priorStops = transport.stopRequests
+    let firstPause = Task { @MainActor in try await runtime.stop() }
+    try await transport.waitForStopGate()
+    try runtimeRequire(runtime.controlState == .pausing && runtime.isControlling && runtime.controlStatus != nil,
+                       "Pause exposes an observable pending acknowledgment")
+    let secondEntered = AsyncStream<Void>.makeStream()
+    let secondPause = Task { @MainActor in
+        secondEntered.continuation.yield(()); secondEntered.continuation.finish()
+        return try await runtime.stop()
+    }
+    for await _ in secondEntered.stream { break }
+    let requestsBeforeConflict = transport.requests.count
+    do {
+        _ = try await runtime.restart()
+        throw runtimeFailure("Restart must not overtake an unacknowledged Pause")
+    } catch ExecutionError.alreadyRunning { }
+    await runtime.refresh()
+    do {
+        _ = try await runtime.dispatch(request)
+        throw runtimeFailure("Delivery must not begin during an unacknowledged Pause")
+    } catch ExecutionError.alreadyRunning { }
+    try runtimeRequire(transport.requests.count == requestsBeforeConflict,
+                       "Pending controls reject conflicting writes and skip read requests")
+    transport.releaseStop()
+    _ = try await firstPause.value; _ = try await secondPause.value
+    try runtimeRequire(transport.stopRequests == priorStops + 1 && !runtime.state.connected && !runtime.isControlling,
+                       "Repeated Pause calls share one acknowledged exchange")
+
+    transport.pauseNextRestart = true
+    let restarting = Task { @MainActor in try await runtime.restart() }
+    try await transport.waitForRestartGate()
+    try runtimeRequire(runtime.controlState == .restarting && runtime.isControlling,
+                       "Restart exposes an observable pending acknowledgment")
+    do {
+        _ = try await runtime.stop()
+        throw runtimeFailure("Pause must not overtake an unacknowledged Restart")
+    } catch ExecutionError.alreadyRunning { }
+    transport.releaseRestart()
+    _ = try await restarting.value
+
+    transport.pauseNextDispatch = true
+    let delivering = Task { @MainActor in try await runtime.dispatch(request) }
+    try await transport.waitForDispatchGate()
+    _ = try await runtime.stop()
+    try runtimeRequire(!runtime.state.connected, "Pause can interrupt a pending delivery exchange")
+    transport.releaseDispatch()
+    do {
+        _ = try await delivering.value
+        throw runtimeFailure("A pre-Pause delivery reply must be rejected")
+    } catch is CancellationError { }
+    try runtimeRequire(!runtime.state.connected && runtime.state.records == retained,
+                       "A late delivery acknowledgment cannot restore pre-Pause presence")
+    _ = try await runtime.restart()
 }
 
 @MainActor
@@ -121,19 +233,31 @@ private final class RuntimeCheckCredentials: ConnectionCredentialStore {
 private final class RuntimeCheckTransport: ServiceHTTPTransport {
     var hostConnected = true
     var failStop = false
+    var failSnapshot = false
     var pauseNextSnapshot = false
     var pauseNextStop = false
+    var pauseNextRestart = false
+    var pauseNextDispatch = false
+    var pauseNextCancel = false
+    var records: [ExecutionRecord] = []
     private(set) var requests: [URLRequest] = []
     private(set) var stopRequests = 0
     private var snapshotGate: CheckedContinuation<Void, Never>?
     private var snapshotObserver: CheckedContinuation<Void, Never>?
     private var stopGate: CheckedContinuation<Void, Never>?
     private var stopObserver: CheckedContinuation<Void, Never>?
+    private var restartGate: CheckedContinuation<Void, Never>?
+    private var restartObserver: CheckedContinuation<Void, Never>?
+    private var dispatchGate: CheckedContinuation<Void, Never>?
+    private var dispatchObserver: CheckedContinuation<Void, Never>?
+    private var cancelGate: CheckedContinuation<Void, Never>?
+    private var cancelObserver: CheckedContinuation<Void, Never>?
 
     func send(_ request: URLRequest) async throws -> ServiceHTTPResponse {
         requests.append(request)
         switch request.url?.path {
         case "/v1/execution/snapshot":
+            if failSnapshot { return .init(data: Data("{}".utf8), statusCode: 503) }
             let response = try snapshot(connected: hostConnected)
             if pauseNextSnapshot {
                 pauseNextSnapshot = false
@@ -156,6 +280,36 @@ private final class RuntimeCheckTransport: ServiceHTTPTransport {
             if failStop { return .init(data: Data("{}".utf8), statusCode: 503) }
             hostConnected = false
             return try snapshot(connected: false)
+        case "/v1/execution/restart":
+            if pauseNextRestart {
+                pauseNextRestart = false
+                await withCheckedContinuation { continuation in
+                    restartGate = continuation
+                    let observer = restartObserver; restartObserver = nil; observer?.resume()
+                }
+            }
+            hostConnected = true
+            return try snapshot(connected: true)
+        case "/v1/execution/dispatch":
+            let response = try snapshot(connected: hostConnected)
+            if pauseNextDispatch {
+                pauseNextDispatch = false
+                await withCheckedContinuation { continuation in
+                    dispatchGate = continuation
+                    let observer = dispatchObserver; dispatchObserver = nil; observer?.resume()
+                }
+            }
+            return response
+        case "/v1/execution/cancel":
+            if pauseNextCancel {
+                pauseNextCancel = false
+                await withCheckedContinuation { continuation in
+                    cancelGate = continuation
+                    let observer = cancelObserver; cancelObserver = nil; observer?.resume()
+                }
+            }
+            if !records.isEmpty { records[0].status = .cancelled }
+            return try snapshot(connected: hostConnected)
         default: throw runtimeFailure("Unexpected runtime route in isolated transport")
         }
     }
@@ -186,8 +340,47 @@ private final class RuntimeCheckTransport: ServiceHTTPTransport {
     func releaseStop() {
         let continuation = stopGate; stopGate = nil; continuation?.resume()
     }
+    func waitForRestartGate() async throws {
+        if restartGate != nil { return }
+        let deadline = Task { @MainActor [weak self] in
+            do { try await Task.sleep(for: .seconds(2)) } catch { return }
+            let observer = self?.restartObserver; self?.restartObserver = nil; observer?.resume()
+        }
+        defer { deadline.cancel() }
+        await withCheckedContinuation { restartObserver = $0 }
+        guard restartGate != nil else { throw runtimeFailure("Delayed Restart fixture did not reach its gate") }
+    }
+    func releaseRestart() {
+        let continuation = restartGate; restartGate = nil; continuation?.resume()
+    }
+    func waitForDispatchGate() async throws {
+        if dispatchGate != nil { return }
+        let deadline = Task { @MainActor [weak self] in
+            do { try await Task.sleep(for: .seconds(2)) } catch { return }
+            let observer = self?.dispatchObserver; self?.dispatchObserver = nil; observer?.resume()
+        }
+        defer { deadline.cancel() }
+        await withCheckedContinuation { dispatchObserver = $0 }
+        guard dispatchGate != nil else { throw runtimeFailure("Delayed delivery fixture did not reach its gate") }
+    }
+    func releaseDispatch() {
+        let continuation = dispatchGate; dispatchGate = nil; continuation?.resume()
+    }
+    func waitForCancelGate() async throws {
+        if cancelGate != nil { return }
+        let deadline = Task { @MainActor [weak self] in
+            do { try await Task.sleep(for: .seconds(2)) } catch { return }
+            let observer = self?.cancelObserver; self?.cancelObserver = nil; observer?.resume()
+        }
+        defer { deadline.cancel() }
+        await withCheckedContinuation { cancelObserver = $0 }
+        guard cancelGate != nil else { throw runtimeFailure("Delayed cancellation fixture did not reach its gate") }
+    }
+    func releaseCancel() {
+        let continuation = cancelGate; cancelGate = nil; continuation?.resume()
+    }
     private func snapshot(connected: Bool) throws -> ServiceHTTPResponse {
-        let value = ExecutionSnapshot(connected: connected, developers: [], records: [], blocker: nil)
+        let value = ExecutionSnapshot(connected: connected, developers: [], records: records, blocker: nil)
         return .init(data: try JSONEncoder().encode(value), statusCode: 200)
     }
 }

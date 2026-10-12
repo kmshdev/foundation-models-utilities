@@ -23,13 +23,17 @@ struct DeveloperRuntimeView: View {
                 if let error = runtime.error { Text(error).foregroundStyle(.red).textSelection(.enabled) }
                 if let blocker = runtime.state.blocker { Text(blocker).foregroundStyle(.secondary).textSelection(.enabled) }
                 if runtime.isConnecting { ProgressView("Connecting to developers…") }
+                if let status = runtime.controlStatus { ProgressView(status) }
                 if runtime.hasRuntime {
                     if !runtime.state.connected {
                         Button("Restart developers", systemImage: "play.fill") { Task { do { _ = try await runtime.restart() } catch { runtime.reportError(error) } } }
                             .buttonStyle(.glassProminent).tint(.green)
+                            .disabled(runtime.isControlling || runtime.isDisconnecting)
                     }
                     Button("Refresh availability", systemImage: "arrow.clockwise") { Task { await runtime.refresh() } }
+                        .disabled(runtime.isControlling || runtime.isDisconnecting)
                     Button("Stop and disconnect", role: .destructive) { Task { await runtime.disconnect() } }
+                        .disabled(runtime.isDisconnecting)
                 }
             }
             #if os(macOS)
@@ -72,6 +76,9 @@ struct DeveloperRuntimeView: View {
                 SecureField("Pairing code", text: $pairingToken)
                 DisclosureGroup("Cloudflare Access credentials") {
                     TextField("Service token client ID", text: $accessID)
+                        #if os(iOS)
+                        .textInputAutocapitalization(.never).autocorrectionDisabled()
+                        #endif
                     SecureField("Service token secret", text: $accessSecret)
                     Text("Required when the runtime is protected by a Cloudflare Access service-token policy.")
                         .font(.callout).foregroundStyle(.secondary)

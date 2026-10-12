@@ -66,6 +66,11 @@ private final class CaptureDelegate: NSObject, NSApplicationDelegate {
                                   name: "04-increased-contrast", width: 1280, height: 858, output: output, highContrast: true)
                 try await capture(StudioRootView(store: store, initialOutcomeID: outcomeID, initialTaskID: "core-01"),
                                   name: "05-light-workspace", width: 1280, height: 858, output: output, scheme: .light)
+                try await capture(StudioRootView(store: store, initialOutcomeID: outcomeID, initialTaskID: "core-01"),
+                                  name: "06-wide-workspace", width: 1600, height: 950, output: output)
+                try await capture(StudioRootView(store: store, initialOutcomeID: outcomeID, initialTaskID: "core-01"),
+                                  name: "07-accessibility-workspace", width: 1280, height: 950, output: output,
+                                  dynamicType: .accessibility2)
                 print("Captured real native SwiftUI views with preview data. Services disabled.")
                 NSApp.terminate(nil)
             } catch {
@@ -75,13 +80,16 @@ private final class CaptureDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func capture<Content: View>(_ content: Content, name: String, width: CGFloat, height: CGFloat, output: URL, highContrast: Bool = false, scheme: ColorScheme = .dark) async throws {
+    private func capture<Content: View>(_ content: Content, name: String, width: CGFloat, height: CGFloat, output: URL,
+                                      highContrast: Bool = false, scheme: ColorScheme = .dark,
+                                      dynamicType: DynamicTypeSize = .large) async throws {
         let root = content
             .frame(width: width, height: height)
             .preferredColorScheme(scheme)
             // Explicit preview traits keep standard and accessibility captures
             // reproducible. Production views inherit the user's display settings.
             .environment(\.legibilityWeight, highContrast ? .bold : .regular)
+            .environment(\.dynamicTypeSize, dynamicType)
             .tint(.blue)
         let host = NSHostingView(rootView: root)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: width, height: height),

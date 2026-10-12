@@ -11,19 +11,29 @@ final class DeveloperRuntimeConnection: ExecutionRemoteHandler {
     private(set) var isConnecting = false
     private(set) var isDispatching = false
     private(set) var isDisconnecting = false
+    private(set) var controlState: RuntimeControlState = .idle
     private(set) var error: String?
     private(set) var publicationErrors: [ExecutionTaskKey: String] = [:]
     private(set) var remoteOrigin: String?
     private(set) var sharingPort: UInt16?
     private(set) var isStartingSharing = false
     private(set) var remoteReachable = false
-    var hasRuntime: Bool { coordinator != nil || remoteClient != nil }
-    var needsAccountDisconnect: Bool { coordinator != nil || connectionKind == .local }
+    var hasRuntime: Bool { connectionKind != nil }
+    var needsAccountDisconnect: Bool { connectionKind == .local }
     private(set) var connectionKind: RuntimeConnectionKind?
     var connectedCount: Int { state.connected ? state.developers.count : 0 }
     var availableCount: Int { state.connected ? state.developers.filter { $0.isAvailable(at: .now) }.count : 0 }
-    var isRemote: Bool { remoteClient != nil }
+    var isRemote: Bool { connectionKind == .remote }
+    var isControlling: Bool { controlState != .idle }
+    var controlStatus: String? {
+        switch controlState {
+        case .idle: nil
+        case .pausing: "Pausing team…"
+        case .restarting: "Restarting developers…"
+        }
+    }
     var status: String {
+        if let controlStatus { return controlStatus }
         if isConnecting { return "Connecting…" }
         if state.connected { return "\(connectedCount) developers connected · \(availableCount) available" }
         if remoteReachable { return "Host connected · Developers offline" }
@@ -34,6 +44,11 @@ final class DeveloperRuntimeConnection: ExecutionRemoteHandler {
     @ObservationIgnored private var remoteClient: ExecutionRemoteClient?
     @ObservationIgnored private var updatesTask: Task<Void, Never>?
     @ObservationIgnored private var generation = UUID()
+    // A connection may survive Pause/Restart. Its read snapshots must not survive
+    // the intervening control operation or restore the earlier worker state.
+    @ObservationIgnored private var snapshotEpoch = UUID()
+    @ObservationIgnored private var latestReadID = UUID()
+    @ObservationIgnored private var controlTask: Task<ExecutionSnapshot, any Error>?
     @ObservationIgnored private var heldURLs: [URL] = []
     @ObservationIgnored private var sharingServer: ExecutionLoopbackServer?
     @ObservationIgnored private let credentials: any ConnectionCredentialStore
@@ -117,13 +132,7 @@ final class DeveloperRuntimeConnection: ExecutionRemoteHandler {
             try await runtime.start()
             guard generation == expected else { await runtime.stop(); return }
             apply(await runtime.snapshot())
-            let changes = await runtime.updates()
-            updatesTask = Task { [weak self] in
-                for await snapshot in changes {
-                    guard let self, self.generation == expected, !Task.isCancelled else { return }
-                    self.apply(snapshot)
-                }
-            }
+            await observeLocal(runtime, generation: expected, epoch: snapshotEpoch)
         } catch {
             if generation == expected {
                 self.error = error.localizedDescription
@@ -159,15 +168,16 @@ final class DeveloperRuntimeConnection: ExecutionRemoteHandler {
                 while !Task.isCancelled {
                     do { try await Task.sleep(for: .seconds(15)) } catch { return }
                     guard let self, self.generation == expected else { return }
+                    guard !self.isControlling, !self.dispatchInFlight else { continue }
+                    let epoch = self.snapshotEpoch
+                    let readID = self.beginSnapshotRead()
                     do {
                         let value = try await client.snapshot()
-                        guard self.generation == expected else { return }
+                        guard self.acceptsSnapshotRead(generation: expected, epoch: epoch, readID: readID) else { continue }
                         self.apply(value); self.remoteReachable = true; self.error = nil
                     } catch {
-                        guard self.generation == expected else { return }
-                        self.error = error.localizedDescription; self.remoteReachable = false
-                        self.apply(.init(connected: false, developers: [], records: self.state.records,
-                                           blocker: "Connection lost · Showing previous execution results"))
+                        guard self.acceptsSnapshotRead(generation: expected, epoch: epoch, readID: readID) else { continue }
+                        self.failSnapshotRead(error, remote: true)
                     }
                 }
             }
@@ -184,20 +194,27 @@ final class DeveloperRuntimeConnection: ExecutionRemoteHandler {
     }
 
     func refresh() async {
+        guard !isControlling, !dispatchInFlight, !isDisconnecting else { return }
         let expected = generation
+        let epoch = snapshotEpoch
+        let readID = beginSnapshotRead()
         let remote = remoteClient; let local = coordinator
         do {
             let value: ExecutionSnapshot
             if let remote { value = try await remote.snapshot() }
             else if let local { try await local.refreshPresence(); value = await local.snapshot() }
             else { return }
-            try requireGeneration(expected)
+            guard acceptsSnapshotRead(generation: expected, epoch: epoch, readID: readID) else { return }
             apply(value); if remote != nil { remoteReachable = true }; error = nil
-        } catch { if generation == expected, !isDisconnecting { self.error = error.localizedDescription } }
+        } catch {
+            if acceptsSnapshotRead(generation: expected, epoch: epoch, readID: readID) {
+                failSnapshotRead(error, remote: remote != nil)
+            }
+        }
     }
 
     private func performRun(_ outcome: Outcome, store: StudioStore) async {
-        guard !isDispatching, !isDisconnecting, let plan = outcome.plan else { return }
+        guard !isDispatching, !isDisconnecting, !isControlling, let plan = outcome.plan else { return }
         let expected = generation
         isDispatching = true; error = nil
         defer { isDispatching = false }
@@ -208,7 +225,8 @@ final class DeveloperRuntimeConnection: ExecutionRemoteHandler {
                 throw ExecutionError.invalidConfiguration("Assignments changed. Run the current plan instead.")
             }
             _ = try await dispatch(.init(outcomeID: outcome.id, outcome: outcome.text, plan: plan))
-        } catch { if generation == expected, !isDisconnecting { self.error = error.localizedDescription } }
+        } catch is CancellationError { }
+        catch { if generation == expected, !isDisconnecting { self.error = error.localizedDescription } }
     }
 
     func run(_ outcome: Outcome, store: StudioStore) async {
@@ -218,14 +236,26 @@ final class DeveloperRuntimeConnection: ExecutionRemoteHandler {
 
     /// Only newly prepared plans enter this queue. Restored plans never dispatch implicitly.
     func enqueue(_ outcome: Outcome, store: StudioStore) {
-        guard state.connected, outcome.plan != nil else { return }
+        guard state.connected, !isControlling, !isDisconnecting, outcome.plan != nil else { return }
         queuedPlans.removeAll { $0.id == outcome.id }
         queuedPlans.append(outcome)
+        startDeliveryIfNeeded(store: store)
+    }
+
+    private func startDeliveryIfNeeded(store: StudioStore) {
+        guard state.connected, !isControlling, !isDisconnecting, !queuedPlans.isEmpty else { return }
         guard deliveryTask == nil else { return }
         let expected = generation
         deliveryTask = Task { [weak self] in
             guard let self else { return }
-            defer { self.deliveryTask = nil }
+            defer {
+                self.deliveryTask = nil
+                // A cancelled delivery can finish after Restart. Start only the
+                // fresh plans enqueued since that control operation completed.
+                if self.generation == expected {
+                    self.startDeliveryIfNeeded(store: store)
+                }
+            }
             while !self.queuedPlans.isEmpty, self.generation == expected, !Task.isCancelled {
                 let next = self.queuedPlans.removeFirst()
                 guard store.workspace.outcomes.first(where: { $0.id == next.id })?.plan == next.plan else { continue }
@@ -264,28 +294,30 @@ final class DeveloperRuntimeConnection: ExecutionRemoteHandler {
     func snapshot() async throws -> ExecutionSnapshot { state }
 
     func dispatch(_ request: ExecutionRemoteDispatch) async throws -> ExecutionSnapshot {
-        guard !dispatchInFlight else { throw ExecutionError.alreadyRunning }
+        guard !dispatchInFlight, !isControlling else { throw ExecutionError.alreadyRunning }
         dispatchInFlight = true
         defer { dispatchInFlight = false }
         let expected = generation
         try requireGeneration(expected)
+        let epoch = beginSnapshotMutation()
         let remote = remoteClient; let local = coordinator
         let value: ExecutionSnapshot
         if let remote { value = try await remote.dispatch(request) }
         else if let local {
             let current = await local.snapshot()
-            try requireGeneration(expected)
+            try requireSnapshotMutation(generation: expected, epoch: epoch)
             for task in request.plan.tasks {
                 if let existing = current.records.first(where: { $0.key.outcomeID == request.outcomeID && $0.key.taskID == task.id }), existing.task != task {
                     throw ExecutionError.taskChanged
                 }
             }
             if let store { try await store.acceptRemoteOutcome(request) }
-            try requireGeneration(expected)
+            try requireSnapshotMutation(generation: expected, epoch: epoch)
             try await local.dispatch(outcomeID: request.outcomeID, outcome: request.outcome, plan: request.plan)
             value = await local.snapshot()
         } else { throw ExecutionError.unavailable("Connect a developer runtime before running assignments.") }
-        try requireGeneration(expected)
+        try requireSnapshotMutation(generation: expected, epoch: epoch)
+        _ = beginSnapshotMutation()
         apply(value)
         return value
     }
@@ -364,53 +396,98 @@ final class DeveloperRuntimeConnection: ExecutionRemoteHandler {
     }
 
     func cancel(_ key: ExecutionTaskKey) async throws -> ExecutionSnapshot {
+        guard !isControlling else { throw ExecutionError.alreadyRunning }
         let expected = generation
         try requireGeneration(expected)
+        let epoch = beginSnapshotMutation()
         let value: ExecutionSnapshot
         if let remote = remoteClient { value = try await remote.cancel(key) }
         else if let local = coordinator { try await local.cancel(key); value = await local.snapshot() }
         else { throw ExecutionError.unavailable("The developer runtime is disconnected.") }
-        try requireGeneration(expected)
+        try requireSnapshotMutation(generation: expected, epoch: epoch)
+        _ = beginSnapshotMutation()
         apply(value)
         return value
     }
 
     func resume(_ key: ExecutionTaskKey) async throws -> ExecutionSnapshot {
+        guard !isControlling else { throw ExecutionError.alreadyRunning }
         let expected = generation
         try requireGeneration(expected)
+        let epoch = beginSnapshotMutation()
         let value: ExecutionSnapshot
         if let remote = remoteClient { value = try await remote.resume(key) }
         else if let local = coordinator { try await local.resume(key); value = await local.snapshot() }
         else { throw ExecutionError.unavailable("The developer runtime is disconnected.") }
-        try requireGeneration(expected)
+        try requireSnapshotMutation(generation: expected, epoch: epoch)
+        _ = beginSnapshotMutation()
         apply(value)
         return value
     }
 
     func restart() async throws -> ExecutionSnapshot {
-        let expected = generation
-        try requireGeneration(expected)
-        let value: ExecutionSnapshot
-        if let remote = remoteClient { value = try await remote.restart() }
-        else if let local = coordinator { try await local.start(); value = await local.snapshot() }
-        else { throw ExecutionError.notConnected }
-        try requireGeneration(expected)
-        apply(value)
-        return value
+        try await performControl(.restarting)
     }
 
     @discardableResult
     func stop() async throws -> ExecutionSnapshot {
+        try await performControl(.pausing)
+    }
+
+    /// Repeated identical controls share one acknowledgment. An opposite control
+    /// cannot begin until that acknowledgment arrives, while Pause can interrupt
+    /// an already-dispatched turn without waiting for its delivery response.
+    private func performControl(_ action: RuntimeControlState) async throws -> ExecutionSnapshot {
+        if let pending = controlTask {
+            guard controlState == action else { throw ExecutionError.alreadyRunning }
+            return try await pending.value
+        }
         let expected = generation
         try requireGeneration(expected)
-        deliveryTask?.cancel(); queuedPlans = []
-        let value: ExecutionSnapshot
-        if let remote = remoteClient { value = try await remote.stop() }
-        else if let local = coordinator { await local.stop(); value = await local.snapshot() }
-        else { return state }
-        try requireGeneration(expected)
-        apply(value)
-        return value
+        guard !isConnecting else { throw ExecutionError.alreadyRunning }
+        let remote = remoteClient; let local = coordinator
+        guard remote != nil || local != nil else {
+            if action == .pausing { return state }
+            throw ExecutionError.notConnected
+        }
+        let epoch = beginSnapshotMutation()
+        controlState = action
+        if action == .pausing { deliveryTask?.cancel(); queuedPlans = [] }
+        // A new subscription after acknowledgment starts with the coordinator's
+        // current snapshot, so buffered pre-Pause values cannot restore presence.
+        if local != nil { updatesTask?.cancel(); updatesTask = nil }
+        let pending = Task { [weak self] in
+            guard let self else { throw CancellationError() }
+            do {
+                let value: ExecutionSnapshot
+                if let remote {
+                    value = action == .pausing ? try await remote.stop() : try await remote.restart()
+                } else if let local {
+                    if action == .pausing { await local.stop() }
+                    else { try await local.start() }
+                    value = await local.snapshot()
+                } else { throw ExecutionError.notConnected }
+                try self.requireSnapshotMutation(generation: expected, epoch: epoch)
+                let acknowledgedEpoch = self.beginSnapshotMutation()
+                self.apply(value)
+                if remote != nil { self.remoteReachable = true }
+                self.error = nil
+                if let local { await self.observeLocal(local, generation: expected, epoch: acknowledgedEpoch) }
+                return self.state
+            } catch {
+                if self.generation == expected, self.snapshotEpoch == epoch, !self.isDisconnecting {
+                    if let local {
+                        self.apply(await local.snapshot())
+                        await self.observeLocal(local, generation: expected, epoch: epoch)
+                        self.error = error.localizedDescription
+                    } else { self.failSnapshotRead(error, remote: true) }
+                }
+                throw error
+            }
+        }
+        controlTask = pending
+        defer { controlTask = nil; controlState = .idle }
+        return try await pending.value
     }
 
     /// All callers await the same shutdown before an account or model can change.
@@ -422,8 +499,11 @@ final class DeveloperRuntimeConnection: ExecutionRemoteHandler {
         deliveryTask?.cancel(); queuedPlans = []
         autoPublicationTask?.cancel(); automaticPublications = []
         sharingServer?.stop(); sharingServer = nil; sharingPort = nil
-        let local = coordinator; let remote = remoteClient; let delivery = deliveryTask
+        let local = coordinator; let remote = remoteClient; let delivery = deliveryTask; let control = controlTask
         let pending = Task { [weak self] in
+            // A network control already in flight finishes before the explicit
+            // disconnect stop; its obsolete reply cannot update this generation.
+            _ = try? await control?.value
             if let remote {
                 do { _ = try await remote.stop() } catch { self?.error = error.localizedDescription }
             }
@@ -442,6 +522,46 @@ final class DeveloperRuntimeConnection: ExecutionRemoteHandler {
     private func requireGeneration(_ expected: UUID) throws {
         try Task.checkCancellation()
         guard generation == expected, !isDisconnecting else { throw CancellationError() }
+    }
+
+    private func beginSnapshotMutation() -> UUID {
+        snapshotEpoch = UUID()
+        return snapshotEpoch
+    }
+
+    private func requireSnapshotMutation(generation expected: UUID, epoch: UUID) throws {
+        try requireGeneration(expected)
+        guard snapshotEpoch == epoch else { throw CancellationError() }
+    }
+
+    private func beginSnapshotRead() -> UUID {
+        latestReadID = UUID()
+        return latestReadID
+    }
+
+    private func acceptsSnapshotRead(generation expected: UUID, epoch: UUID, readID: UUID) -> Bool {
+        !Task.isCancelled && generation == expected && snapshotEpoch == epoch && latestReadID == readID &&
+            !isDisconnecting && !isControlling
+    }
+
+    private func failSnapshotRead(_ failure: any Error, remote: Bool) {
+        error = failure.localizedDescription
+        if remote { remoteReachable = false }
+        apply(.init(connected: remote ? false : state.connected, developers: [], records: state.records,
+                    blocker: remote ? "Connection lost · Showing previous execution results" : "Availability could not be refreshed · Showing previous execution results",
+                    pullRequests: state.pullRequests))
+    }
+
+    private func observeLocal(_ local: ExecutionDeveloperCoordinator, generation expected: UUID, epoch: UUID) async {
+        let changes = await local.updates()
+        guard generation == expected, snapshotEpoch == epoch, !isDisconnecting else { return }
+        updatesTask = Task { [weak self] in
+            for await snapshot in changes {
+                guard let self, self.generation == expected, !Task.isCancelled else { return }
+                guard !self.isControlling else { continue }
+                self.apply(snapshot)
+            }
+        }
     }
 
     func shareRuntime() async {

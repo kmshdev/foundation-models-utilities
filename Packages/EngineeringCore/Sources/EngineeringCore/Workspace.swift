@@ -135,11 +135,13 @@ public struct Workspace: Codable, Sendable, Equatable {
     public var questions: [QuestionBatch] = []
     /// Persisted with messages so sending and clearing a composer are atomic.
     public var drafts: [UUID: String] = [:]
+    /// Text for the creation sheet before an outcome identity has been allocated.
+    public var newOutcomeDraft = ""
     public var issueBindings: [TaskIssueBinding] = []
     public init() {}
 
     private enum CodingKeys: String, CodingKey {
-        case version, revision, outcomes, messages, questions, drafts, issueBindings
+        case version, revision, outcomes, messages, questions, drafts, newOutcomeDraft, issueBindings
     }
 
     public init(from decoder: any Decoder) throws {
@@ -151,6 +153,7 @@ public struct Workspace: Codable, Sendable, Equatable {
         questions = try values.decode([QuestionBatch].self, forKey: .questions)
         // Workspaces written before draft persistence remain readable.
         drafts = try values.decodeIfPresent([UUID: String].self, forKey: .drafts) ?? [:]
+        newOutcomeDraft = try values.decodeIfPresent(String.self, forKey: .newOutcomeDraft) ?? ""
         issueBindings = try values.decodeIfPresent([TaskIssueBinding].self, forKey: .issueBindings) ?? []
     }
 

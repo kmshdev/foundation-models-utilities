@@ -7,7 +7,7 @@ final class OutcomeDraft {
     var text: String {
         didSet { if text != oldValue { didChange?() } }
     }
-    @ObservationIgnored private let didChange: (@MainActor () -> Void)?
+    @ObservationIgnored fileprivate var didChange: (@MainActor () -> Void)?
     init(text: String = "", didChange: (@MainActor () -> Void)? = nil) {
         self.text = text
         self.didChange = didChange
@@ -17,6 +17,8 @@ final class OutcomeDraft {
 @MainActor @Observable
 final class StudioStore {
     typealias Planner = @MainActor (String, String) async throws -> PlanningResult
+    /// A stable draft survives presentation changes before it becomes an outcome.
+    let newOutcomeDraft = OutcomeDraft()
     private(set) var workspace = Workspace()
     private(set) var isLoaded = false
     private(set) var isPlanning = false
@@ -40,6 +42,7 @@ final class StudioStore {
     @ObservationIgnored private var saveTask: Task<Bool, Never>?
     @ObservationIgnored private var lastSaveRevision = 0
     @ObservationIgnored private var saveFailure: String?
+    @ObservationIgnored private var newOutcomeDraftEdited = false
 
     init() {
         let directory = URL.applicationSupportDirectory.appendingPathComponent("EngineeringStudio", isDirectory: true)
@@ -51,6 +54,7 @@ final class StudioStore {
         } else {
             planningProvider = UserDefaults.standard.bool(forKey: "usesOnDeviceModel") ? .onDevice : .disabled
         }
+        configureNewOutcomeDraft()
     }
 
     /// Dependency injection for persistence checks; no user defaults are changed.
@@ -59,6 +63,7 @@ final class StudioStore {
         self.repository = repository
         planningProvider = usesOnDeviceModel ? .onDevice : .disabled
         self.planner = planner
+        configureNewOutcomeDraft()
     }
 
     /// Retains unsent text across outcome/view switches and app relaunches.
@@ -95,6 +100,8 @@ final class StudioStore {
         isLoaded = true
         loadStarted = true
         saveState = "Preview data · not connected"
+        newOutcomeDraft.text = workspace.newOutcomeDraft
+        configureNewOutcomeDraft()
     }
     #endif
 
@@ -103,7 +110,13 @@ final class StudioStore {
         do {
             workspace = try await repository.load()
             lastSaveRevision = workspace.revision
+            let preservesEdits = newOutcomeDraftEdited
+            if !preservesEdits {
+                newOutcomeDraft.text = workspace.newOutcomeDraft
+                newOutcomeDraftEdited = false
+            }
             isLoaded = true; failure = nil; saveState = "Saved on this device"
+            if preservesEdits { persist() }
         } catch {
             loadStarted = false
             failure = "Could not open the workspace. \(error.localizedDescription)"
@@ -158,6 +171,19 @@ final class StudioStore {
             return true
         }
         catch { failure = error.localizedDescription; return false }
+    }
+
+    /// Creation and draft removal share one snapshot. Rejected input stays editable.
+    @discardableResult func createOutcomeFromDraft() -> Outcome? {
+        guard isLoaded else { return nil }
+        do {
+            let id = try workspace.recordOutcome(newOutcomeDraft.text)
+            guard let outcome = workspace.outcomes.first(where: { $0.id == id }) else { return nil }
+            newOutcomeDraft.text = ""
+            persist()
+            if isPlanningEnabled { plan(outcome) }
+            return outcome
+        } catch { failure = error.localizedDescription; return nil }
     }
 
     func hasImportedIssue(id: String) -> Bool {
@@ -323,10 +349,19 @@ final class StudioStore {
         }
     }
 
+    private func configureNewOutcomeDraft() {
+        newOutcomeDraft.didChange = { [weak self] in
+            guard let self else { return }
+            self.newOutcomeDraftEdited = true
+            self.scheduleDraftSave()
+        }
+    }
+
     @discardableResult private func persist() -> Task<Bool, Never> {
         draftSaveTask?.cancel()
         draftSaveTask = nil
         var snapshot = workspace
+        snapshot.newOutcomeDraft = newOutcomeDraft.text
         for (id, draft) in drafts {
             snapshot.drafts[id] = draft.text.isEmpty ? nil : draft.text
         }

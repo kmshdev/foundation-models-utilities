@@ -88,7 +88,56 @@ func checkStudioStore() async throws {
                 "Failed loads can be retried after repair")
     try await checkAutomaticPlanning(in: directory)
     try await checkLinearIntakeAndPublication(in: directory)
-    print("StudioStore regression checks passed: draft isolation, relaunch, atomic send, write ordering, failed-write retention, retry and load recovery.")
+    try await checkNewOutcomeDraft(in: directory)
+    print("StudioStore regression checks passed: draft isolation, durable outcome creation, relaunch, atomic send, write ordering, failed-write retention, retry and load recovery.")
+}
+
+@MainActor
+private func checkNewOutcomeDraft(in directory: URL) async throws {
+    let url = directory.appendingPathComponent("new-outcome-draft.json")
+    let repository = WorkspaceRepository(url: url)
+    var workspace = Workspace()
+    workspace.newOutcomeDraft = "Saved creation draft\nwith exact whitespace "
+    workspace.revision = 1
+    try await repository.save(workspace)
+    let store = StudioStore(repository: repository)
+    await store.load()
+    let draft = store.newOutcomeDraft
+    try require(draft.text == workspace.newOutcomeDraft && store.newOutcomeDraft === draft,
+                "Creation presentation shares one restored, stable draft instance")
+    draft.text = "  Build the native engineering coordinator\nwith handoffs  "
+    try require(await store.flushPendingChanges(), "An unsubmitted new outcome reaches disk")
+    let reopened = StudioStore(repository: repository)
+    await reopened.load()
+    try require(reopened.newOutcomeDraft.text == draft.text && reopened.workspace.outcomes.isEmpty,
+                "Closing and reopening creation retains text without creating an outcome")
+    guard let created = reopened.createOutcomeFromDraft() else {
+        throw NSError(domain: "StudioStoreChecks", code: 1,
+                      userInfo: [NSLocalizedDescriptionKey: "Valid creation draft was rejected"])
+    }
+    try require(reopened.newOutcomeDraft.text.isEmpty && reopened.workspace.outcomes.count == 1 &&
+                created.text == "Build the native engineering coordinator\nwith handoffs",
+                "Creating an outcome clears only its accepted creation draft")
+    try require(reopened.createOutcomeFromDraft() == nil && reopened.workspace.outcomes.count == 1,
+                "Repeated creation cannot duplicate an already-cleared draft")
+    try require(await reopened.flushPendingChanges(), "Created outcome and draft removal reach disk together")
+    let completed = try await repository.load()
+    try require(completed.newOutcomeDraft.isEmpty && completed.outcomes.first?.id == created.id &&
+                completed.messages.count == 1, "Relaunch keeps the outcome and never restores its sent creation text")
+
+    let unloaded = StudioStore(repository: repository)
+    unloaded.newOutcomeDraft.text = "Keep this edit made before the workspace opens"
+    try require(unloaded.createOutcomeFromDraft() == nil && !unloaded.newOutcomeDraft.text.isEmpty,
+                "Rejected unloaded creation preserves its text")
+    await unloaded.load()
+    try require(unloaded.newOutcomeDraft.text == "Keep this edit made before the workspace opens",
+                "A delayed load cannot overwrite an edit already owned by the creation draft")
+    try require(await unloaded.flushPendingChanges(), "Pre-load edits reach disk after workspace recovery")
+    try require(try await repository.load().newOutcomeDraft == unloaded.newOutcomeDraft.text,
+                "Pre-load edits survive relaunch alongside the loaded outcomes")
+    unloaded.newOutcomeDraft.text = " \n "
+    try require(unloaded.createOutcomeFromDraft() == nil && unloaded.newOutcomeDraft.text == " \n ",
+                "Empty creation is rejected without deleting editable whitespace")
 }
 
 @MainActor

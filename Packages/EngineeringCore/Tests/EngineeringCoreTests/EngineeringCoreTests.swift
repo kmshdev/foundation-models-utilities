@@ -40,12 +40,35 @@ private func task(_ id: String, path: String, dependencies: [String] = []) -> Wo
     let data = try JSONEncoder().encode(workspace)
     var fields = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
     fields.removeValue(forKey: "drafts")
+    fields.removeValue(forKey: "newOutcomeDraft")
     fields.removeValue(forKey: "issueBindings")
     let restored = try JSONDecoder().decode(Workspace.self, from: JSONSerialization.data(withJSONObject: fields))
     #expect(restored == workspace)
     #expect(restored.drafts.isEmpty)
+    #expect(restored.newOutcomeDraft.isEmpty)
     #expect(restored.issueBindings.isEmpty)
     #expect(restored.outcomes.first?.source == nil)
+}
+
+@Test func newOutcomeDraftSurvivesReloadAndClearsWithCreatedOutcome() async throws {
+    let directory = URL.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let repository = WorkspaceRepository(url: directory.appendingPathComponent("workspace.json"))
+    var workspace = Workspace()
+    workspace.newOutcomeDraft = "  Build the engineering room\nwith preserved whitespace  "
+    workspace.revision += 1
+    try await repository.save(workspace)
+    var restored = try await repository.load()
+    #expect(restored.newOutcomeDraft == workspace.newOutcomeDraft)
+    let id = try restored.recordOutcome(restored.newOutcomeDraft)
+    restored.newOutcomeDraft = ""
+    try await repository.save(restored)
+    let created = try await repository.load()
+    #expect(created.newOutcomeDraft.isEmpty)
+    #expect(created.outcomes.first?.id == id)
+    #expect(created.outcomes.first?.text == "Build the engineering room\nwith preserved whitespace")
+    #expect(created.messages.count == 1)
+    await #expect(throws: WorkspaceError.staleRevision) { try await repository.save(workspace) }
 }
 
 @Test func importedSourceIdentitySurvivesReloadAndPreventsDuplicates() throws {

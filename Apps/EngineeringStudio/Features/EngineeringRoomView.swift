@@ -9,12 +9,20 @@ struct EngineeringRoomView: View {
     let selectedTaskID: String?
     let inspectTask: (String) -> Void
     let openConnections: () -> Void
+    let openSettings: () -> Void
+    let openRuntime: () -> Void
     private let initialDraft: String
     @State private var showsTasks = false
+    @State private var followsLatest = true
+    @State private var isNearLatest = true
+    @State private var isUserScrolling = false
+    @State private var unreadMessages = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// One-time draft seed used only by self-contained previews.
     init(store: StudioStore, connections: ServiceConnections, runtime: DeveloperRuntimeConnection = DeveloperRuntimeConnection(), outcome: Outcome, selectedTaskID: String?, initialDraft: String = "",
-         openConnections: @escaping () -> Void, inspectTask: @escaping (String) -> Void) {
+         openConnections: @escaping () -> Void, openSettings: @escaping () -> Void,
+         openRuntime: @escaping () -> Void, inspectTask: @escaping (String) -> Void) {
         self.store = store
         self.connections = connections
         self.runtime = runtime
@@ -22,12 +30,13 @@ struct EngineeringRoomView: View {
         self.selectedTaskID = selectedTaskID
         self.inspectTask = inspectTask
         self.openConnections = openConnections
+        self.openSettings = openSettings
+        self.openRuntime = openRuntime
         self.initialDraft = initialDraft
     }
 
     private var messages: [RoomMessage] { store.workspace.messages.filter { $0.outcomeID == outcome.id } }
     private var questions: [QuestionBatch] { store.workspace.questions.filter { $0.outcomeID == outcome.id && !$0.isComplete } }
-    private var selectedTask: WorkTask? { outcome.plan?.tasks.first { $0.id == selectedTaskID } }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -54,122 +63,66 @@ struct EngineeringRoomView: View {
                             }
                         }
                         if let plan = outcome.plan {
-                            TaskSummaryView(tasks: plan.tasks, selectedTaskID: selectedTaskID, records: runtime.state.records.filter { $0.key.outcomeID == outcome.id }, inspectTask: inspectTask)
-                        }
-                        if let selectedTask, !showsTasks {
-                            ProposedHandoffView(task: selectedTask, record: runtime.record(outcomeID: outcome.id, taskID: selectedTask.id))
+                            OutcomeAssignmentsView(outcomeID: outcome.id, tasks: plan.tasks, selectedTaskID: selectedTaskID,
+                                                   showsHandoff: !showsTasks, runtime: runtime, inspectTask: inspectTask)
                         }
                         ForEach(questions) { batch in
                             QuestionBatchView(batch: batch) { store.answer(batch, answers: $0) }
                         }
-                        OutcomeSummary(outcome: outcome, store: store, runtime: runtime)
+                        OutcomePlanningControls(outcome: outcome, store: store, openSettings: openSettings)
                         if outcome.plan != nil {
+                            OutcomeExecutionControls(outcome: outcome, store: store, runtime: runtime, openRuntime: openRuntime)
+                            ExecutionResultsView(outcomeID: outcome.id, tasks: outcome.plan?.tasks ?? [], runtime: runtime, inspect: inspectTask)
                             PlanPublishingControls(outcome: outcome, store: store, connections: connections,
                                                    openConnections: openConnections)
                         }
                         Color.clear.frame(height: 1).id("end")
-                    }.padding(.horizontal, 10).padding(.top, 16).padding(.bottom, 12)
+                    }
+                    .padding(.horizontal, 10).padding(.top, 16).padding(.bottom, 12)
+                    .frame(maxWidth: 760).frame(maxWidth: .infinity)
                 }
-                .onChange(of: messages.count) { _, _ in proxy.scrollTo("end", anchor: .bottom) }
+                .onScrollGeometryChange(for: Bool.self) { geometry in
+                    geometry.visibleRect.maxY >= geometry.contentSize.height - 80
+                } action: { _, nearLatest in
+                    isNearLatest = nearLatest
+                    if isUserScrolling { followsLatest = nearLatest }
+                    if nearLatest { unreadMessages = 0 }
+                }
+                .onScrollPhaseChange { _, phase in
+                    isUserScrolling = phase == .interacting || phase == .decelerating
+                    if phase == .idle, isNearLatest { followsLatest = true }
+                }
+                .onChange(of: messages.count) { oldCount, newCount in
+                    guard !showsTasks, newCount > oldCount else { return }
+                    if followsLatest || messages.last?.author == .user {
+                        followsLatest = true
+                        revealLatest(using: proxy)
+                    } else { unreadMessages += newCount - oldCount }
+                }
+                .overlay(alignment: .bottom) {
+                    if unreadMessages > 0, !showsTasks {
+                        Button {
+                            followsLatest = true; unreadMessages = 0
+                            revealLatest(using: proxy)
+                        } label: {
+                            Label("\(unreadMessages) new messages", systemImage: "arrow.down")
+                        }
+                        .buttonStyle(.glass).controlSize(.large).padding(.bottom, StudioSpacing.medium)
+                    }
+                }
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             OutcomeComposer(store: store, outcomeID: outcome.id,
                             draft: store.draft(for: outcome.id, initialText: initialDraft))
                 .padding(.top, StudioSpacing.standard)
+                .frame(maxWidth: 760).frame(maxWidth: .infinity)
         }
     }
 
-}
-
-struct MessageRow: View {
-    let message: RoomMessage
-    var body: some View {
-        HStack(alignment: .top, spacing: 16) {
-            SymbolBadge(symbol: message.author == .user ? "person.fill" : "sparkle", size: 48)
-            VStack(alignment: .leading, spacing: 7) {
-                HStack(spacing: 10) {
-                    Text(message.author == .user ? "You" : "Coordinator").font(StudioTypography.label)
-                    if message.author != .user { Text("· AI").foregroundStyle(.secondary) }
-                    Text(message.createdAt, style: .time).foregroundStyle(.secondary)
-                }.font(StudioTypography.secondary)
-                Text(message.text).font(StudioTypography.body).lineSpacing(4)
-                    .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
-            }.padding(.top, 4)
-            Spacer(minLength: 0)
-        }.accessibilityElement(children: .combine)
-    }
-}
-
-private struct ProposedHandoffView: View {
-    let task: WorkTask
-    let record: ExecutionRecord?
-    var body: some View {
-        HStack(alignment: .top, spacing: 16) {
-            SymbolBadge(symbol: task.owner.symbol)
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 8) {
-                    Text(task.owner.displayName).fontWeight(.semibold)
-                    Text(record?.task == task && record?.status == .completed ? "· Result" : "· Handoff").foregroundStyle(.secondary)
-                }.font(StudioTypography.secondary)
-                Text(record?.task == task && record?.status == .completed ? (record?.summary ?? task.handoff) : task.handoff).font(StudioTypography.body).lineSpacing(4)
-                HStack(spacing: 12) {
-                    SymbolBadge(symbol: "doc.text", size: 40)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(task.title)
-                        Text(record?.task == task ? record!.status.rawValue.capitalized : "Planned · Not dispatched").font(StudioTypography.secondary).foregroundStyle(.secondary)
-                    }
-                    Spacer(minLength: 0)
-                    Image(systemName: "arrow.turn.down.right").foregroundStyle(.secondary)
-                }
-                .padding(12).background(.thinMaterial, in: .rect(cornerRadius: 13))
-                .overlay { RoundedRectangle(cornerRadius: 13).strokeBorder(.primary.opacity(0.10)) }
-            }.padding(.top, 5)
-        }
-    }
-}
-
-struct OutcomeSummary: View {
-    let outcome: Outcome
-    let store: StudioStore
-    let runtime: DeveloperRuntimeConnection
-    private var waiting: Bool { store.workspace.questions.contains { $0.outcomeID == outcome.id && !$0.isComplete } }
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if store.planningOutcomeID == outcome.id {
-                HStack { ProgressView().controlSize(.small); Text("Preparing assignments…") }
-                Button("Cancel Planning", systemImage: "stop.fill") { store.cancelPlanning() }
-                    .buttonStyle(.glass).tint(.orange).controlSize(.large)
-            } else if waiting {
-                Label("Waiting for your answers", systemImage: "bubble.left.and.text.bubble.right")
-            } else if store.isQueuedForPlanning(outcome.id) {
-                Label("Planning queued", systemImage: "clock")
-            } else if store.isPlanningEnabled {
-                Button(outcome.plan == nil ? "Prepare Plan" : "Update Plan", systemImage: "play.fill") { store.plan(outcome) }
-                    .buttonStyle(.glassProminent).tint(.green).controlSize(.large).disabled(store.isPlanning)
-            } else if outcome.plan == nil {
-                Text("Choose a planning model in Settings to prepare assignments.").foregroundStyle(.secondary)
-            }
-            if outcome.plan != nil {
-                HStack {
-                    Label(runtime.outcomeStatus(outcome), systemImage: runtime.state.connected ? "terminal" : "network.slash")
-                        .font(StudioTypography.caption).foregroundStyle(.secondary)
-                    Spacer(minLength: 0)
-                    if !runtime.hasDelivered(outcome) {
-                        Button("Run Team", systemImage: "play.fill") { Task { await runtime.run(outcome, store: store) } }
-                            .buttonStyle(.glassProminent).tint(.green)
-                            .disabled(!runtime.state.connected || runtime.isDispatching || store.isPlanning)
-                    }
-                }
-            }
-            if let error = runtime.error { Text(error).font(.callout).foregroundStyle(.red).textSelection(.enabled) }
-            ForEach(runtime.state.records.filter { $0.key.outcomeID == outcome.id && !$0.summary.isEmpty }) { record in
-                VStack(alignment: .leading, spacing: 6) {
-                    Label(record.task.title, systemImage: record.task.owner.symbol).font(.headline)
-                    Text(record.summary).textSelection(.enabled)
-                    if let blocker = record.blocker { Label(blocker, systemImage: "exclamationmark.triangle").foregroundStyle(.orange) }
-                }.padding(.vertical, 8)
-            }
+    private func revealLatest(using proxy: ScrollViewProxy) {
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
+            proxy.scrollTo("end", anchor: .bottom)
         }
     }
 }

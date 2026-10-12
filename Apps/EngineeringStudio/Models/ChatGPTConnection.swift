@@ -106,15 +106,32 @@ final class ChatGPTConnection {
         isRefreshing = true
         catalogState = .loading
         let expected = generation
-        defer { if generation == expected { isRefreshing = false } }
+        var ownsAccountChange = false
+        defer {
+            if generation == expected {
+                isRefreshing = false
+                if ownsAccountChange { isChangingAccountOrModel = false }
+            }
+        }
         do {
             let choices = try await responsesClient.models()
             guard generation == expected else { return }
-            models = choices
-            catalogState = .available
             let saved = activeAccount.map { UserDefaults.standard.string(forKey: modelPreferenceKey($0.id)) } ?? nil
             let preferred = selectedModel ?? saved
-            selectedModel = choices.first(where: { $0.slug == preferred })?.slug ?? choices.first?.slug
+            let replacement = choices.first(where: { $0.slug == preferred })?.slug ?? choices.first?.slug
+            if let current = selectedModel, replacement != current {
+                // A refresh can remove the selected model without a picker edit.
+                // Stop its dependent executor before publishing that replacement.
+                if !isChangingAccountOrModel {
+                    isChangingAccountOrModel = true
+                    ownsAccountChange = true
+                }
+                await beforeAccountChange?()
+                guard generation == expected, isSignedIn else { return }
+            }
+            models = choices
+            selectedModel = replacement
+            catalogState = .available
             error = choices.isEmpty ? "This account has no available subscription models." : nil
             saveModelPreference()
         } catch {
