@@ -224,7 +224,7 @@ public enum WorkspaceError: Error, LocalizedError, Equatable {
         case .missingIssueBinding: "Reserve and save an issue ID before publishing this task."
         case .issueReceiptMismatch: "The Linear receipt does not match this task's reserved issue ID."
         case .workspaceNotLoaded: "Open the workspace before publishing tasks."
-        case .publicationNotSaved: "Could not save the Linear publication state on this device. Retry to reconcile the issue before continuing."
+        case .publicationNotSaved: "Could not save the workspace publication state on this device. Retry before continuing."
         }
     }
 }

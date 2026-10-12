@@ -29,6 +29,7 @@ final class StudioStore {
     private let repository: WorkspaceRepository
     @ObservationIgnored private let planner: Planner
     @ObservationIgnored private var subscriptionPlanner: Planner?
+    @ObservationIgnored private var planPrepared: (@MainActor (Outcome) -> Void)?
     @ObservationIgnored private var loadStarted = false
     @ObservationIgnored private var planningTask: Task<Void, Never>?
     private var planningQueue: [UUID] = []
@@ -115,6 +116,26 @@ final class StudioStore {
 
     func configureSubscriptionPlanner(_ planner: @escaping Planner) {
         subscriptionPlanner = planner
+    }
+
+    func configurePlanPrepared(_ action: @escaping @MainActor (Outcome) -> Void) { planPrepared = action }
+
+    /// A remote phone and its host preserve the same outcome and task identities.
+    func acceptRemoteOutcome(_ request: ExecutionRemoteDispatch) async throws {
+        guard isLoaded else { throw WorkspaceError.workspaceNotLoaded }
+        try PlanValidator.validate(request.plan)
+        if let index = workspace.outcomes.firstIndex(where: { $0.id == request.outcomeID }) {
+            guard workspace.outcomes[index].text == request.outcome else {
+                throw ExecutionError.invalidConfiguration("This outcome ID already belongs to a different request.")
+            }
+            if workspace.outcomes[index].plan != request.plan { try workspace.attach(request.plan, to: request.outcomeID) }
+        } else {
+            workspace.outcomes.append(Outcome(id: request.outcomeID, text: request.outcome, plan: request.plan))
+            workspace.messages.append(.init(author: .user, text: request.outcome, outcomeID: request.outcomeID))
+            workspace.messages.append(.init(author: .coordinator, text: request.plan.summary, outcomeID: request.outcomeID))
+            workspace.revision += 1
+        }
+        guard await flushPendingChanges() else { throw WorkspaceError.publicationNotSaved }
     }
 
     func setPlanningProvider(_ provider: PlanningProvider) {
@@ -239,6 +260,10 @@ final class StudioStore {
                         try workspace.attach(plan, to: outcomeID)
                     }
                     persist()
+                    if result.questions.isEmpty, result.plan != nil,
+                       let prepared = workspace.outcomes.first(where: { $0.id == outcomeID }) {
+                        planPrepared?(prepared)
+                    }
                 } catch is CancellationError { }
                 catch {
                     if !Task.isCancelled, contextVersions[outcomeID] == version {

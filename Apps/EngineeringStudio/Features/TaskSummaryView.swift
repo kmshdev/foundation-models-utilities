@@ -4,8 +4,16 @@ import SwiftUI
 struct TaskSummaryView: View {
     let tasks: [WorkTask]
     let selectedTaskID: String?
+    let records: [ExecutionRecord]
     let inspectTask: (String) -> Void
     @Environment(\.dynamicTypeSize) private var dynamicType
+
+    init(tasks: [WorkTask], selectedTaskID: String?, records: [ExecutionRecord] = [], inspectTask: @escaping (String) -> Void) {
+        self.tasks = tasks
+        self.selectedTaskID = selectedTaskID
+        self.records = records
+        self.inspectTask = inspectTask
+    }
 
     var body: some View {
         Group {
@@ -43,51 +51,11 @@ struct TaskSummaryView: View {
         ForEach(tasks) { task in
             VStack(spacing: 0) {
                 Divider()
-                TaskSummaryRow(task: task, selected: selectedTaskID == task.id, compact: compact) {
+                TaskSummaryRow(task: task, selected: selectedTaskID == task.id, compact: compact,
+                               record: records.first { $0.task == task }) {
                     inspectTask(task.id)
                 }
             }
         }
     }
-}
-
-private struct TaskSummaryRow: View {
-    let task: WorkTask
-    let selected: Bool
-    let compact: Bool
-    let select: () -> Void
-
-    var body: some View {
-        Button(action: select) {
-            Group {
-                if compact {
-                    VStack(alignment: .leading, spacing: StudioSpacing.small) {
-                        Text(task.title).font(StudioTypography.heading)
-                        ViewThatFits(in: .horizontal) {
-                            HStack { owner; Spacer(); status }
-                            VStack(alignment: .leading, spacing: StudioSpacing.small) { owner; status }
-                        }.font(StudioTypography.secondary)
-                    }.frame(maxWidth: .infinity, alignment: .leading)
-                } else {
-                    HStack(spacing: StudioSpacing.medium) {
-                        Text(task.title).frame(maxWidth: .infinity, alignment: .leading)
-                        owner.frame(width: 130, alignment: .leading)
-                        status.frame(width: 108, alignment: .leading)
-                    }.font(StudioTypography.body)
-                }
-            }
-            .padding(.horizontal, StudioSpacing.standard).padding(.vertical, StudioSpacing.medium)
-            .frame(minHeight: 44).contentShape(.rect)
-            .background(selected ? StudioStyle.accent.opacity(0.12) : .clear)
-            .overlay(alignment: .leading) {
-                if selected { Rectangle().fill(StudioStyle.accent).frame(width: 3).accessibilityHidden(true) }
-            }
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(task.title), \(task.owner.title), planned")
-        .accessibilityAddTraits(selected ? [.isSelected] : [])
-        .accessibilityHint("Show scope and handoff in task details")
-    }
-    private var owner: some View { Text(task.owner.displayName).foregroundStyle(.secondary) }
-    private var status: some View { Label("Planned", systemImage: "circle.dashed").foregroundStyle(.secondary) }
 }

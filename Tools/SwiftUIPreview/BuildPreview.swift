@@ -84,7 +84,9 @@ try run(["swiftc"] + common + ["-parse-as-library", "-I", output.path, "-L", out
         root.appendingPathComponent("Tools/SwiftUIPreview/ServiceChecks.swift").path,
         root.appendingPathComponent("Tools/SwiftUIPreview/SubscriptionModelChecks.swift").path,
         root.appendingPathComponent("Tools/SwiftUIPreview/AuthenticationChecks.swift").path,
-        root.appendingPathComponent("Tools/SwiftUIPreview/ChatGPTConnectionChecks.swift").path])
+        root.appendingPathComponent("Tools/SwiftUIPreview/ChatGPTConnectionChecks.swift").path,
+        root.appendingPathComponent("Tools/SwiftUIPreview/RemoteExecutionChecks.swift").path,
+        root.appendingPathComponent("Tools/SwiftUIPreview/RuntimeConnectionChecks.swift").path])
 try run(["actool", root.appendingPathComponent("Apps/EngineeringStudio/Assets.xcassets").path,
         "--compile", resources.path, "--platform", "macosx", "--minimum-deployment-target", "27.0"])
 let info: [String: Any] = ["CFBundleExecutable": "SwiftUIPreview", "CFBundleIdentifier": "dev.kmsh.engineeringstudio.preview",

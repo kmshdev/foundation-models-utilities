@@ -1,0 +1,18 @@
+{
+  "commit" : "1c4511613d08b8f50a36979af3c233d6cf0e0bb5",
+  "images" : [
+    "macos-27.png",
+    "ios-27.png"
+  ],
+  "iosInstalledBundleIdentifier" : "dev.kmsh.engineeringstudio",
+  "iosProcessID" : 30613,
+  "macProcessID" : 28518,
+  "macWindowID" : 33,
+  "simulatorID" : "2CEC9A7A-B3F7-4C58-849E-062EE3961AE0",
+  "simulatorRuntime" : "com.apple.CoreSimulator.SimRuntime.iOS-27-0",
+  "usesProductionTargets" : true,
+  "verifiedPlatforms" : [
+    "macOS",
+    "iOS"
+  ]
+}

@@ -5,7 +5,7 @@ private enum WorkspaceDestination: Hashable {
     case all, needsInput, outcome(UUID)
 }
 private enum StudioSheet: String, Identifiable {
-    case newOutcome, team, settings, connections
+    case newOutcome, team, settings, connections, runtime
     var id: Self { self }
 }
 
@@ -13,6 +13,7 @@ struct StudioRootView: View {
     let store: StudioStore
     let connections: ServiceConnections
     let chatGPT: ChatGPTConnection
+    let runtime: DeveloperRuntimeConnection
     #if os(macOS)
     @Environment(\.openSettings) private var openSettings
     #endif
@@ -26,10 +27,12 @@ struct StudioRootView: View {
 
     /// One-time selection seeds for self-contained SwiftUI previews.
     init(store: StudioStore, connections: ServiceConnections = ServiceConnections(), chatGPT: ChatGPTConnection = ChatGPTConnection(),
+         runtime: DeveloperRuntimeConnection = DeveloperRuntimeConnection(),
          initialOutcomeID: UUID? = nil, initialTaskID: String? = nil, initialDraft: String = "") {
         self.store = store
         self.connections = connections
         self.chatGPT = chatGPT
+        self.runtime = runtime
         self.initialDraft = initialDraft
         _destination = State(initialValue: initialOutcomeID.map(WorkspaceDestination.outcome) ?? .all)
         _selectedTaskID = State(initialValue: initialTaskID)
@@ -102,18 +105,20 @@ struct StudioRootView: View {
                         .keyboardShortcut("n", modifiers: .command)
                         .accessibilityLabel("New outcome").help("Start a new outcome").disabled(!store.isLoaded)
                         Button {
-                            store.cancelPlanning()
+                            if store.isPlanning { store.cancelPlanning() }
+                            else { Task { do { _ = try await runtime.stop() } catch { runtime.reportError(error) } } }
                         } label: {
                             Label(store.isPlanning ? "Cancel Planning" : "Pause Team",
                                   systemImage: store.isPlanning ? "stop.fill" : "pause.fill")
                                 .font(.system(size: 15, weight: .medium)).padding(.horizontal, 6).frame(height: 28)
                         }
                         .labelStyle(.titleAndIcon)
-                        .buttonStyle(.glass).tint(.orange).disabled(!store.isPlanning)
-                        .help(store.isPlanning ? "Cancel planning" : "Developer execution is not connected yet")
+                        .buttonStyle(.glass).tint(.orange).disabled(!store.isPlanning && !runtime.state.connected)
+                        .help(store.isPlanning ? "Cancel planning" : "Stop developer turns and retain their context")
                         Menu {
                             Button("Developers", systemImage: "person.2") { sheet = .team }
                             Button("Connections", systemImage: "link") { sheet = .connections }
+                            Button("Developer runtime", systemImage: "terminal") { sheet = .runtime }
                             Button("Settings", systemImage: "gearshape") { openSettings() }
                         } label: {
                             Image(systemName: "ellipsis").font(.system(size: 18)).frame(width: 40, height: 40)
@@ -123,21 +128,6 @@ struct StudioRootView: View {
                     }
                 }
             }.sharedBackgroundVisibility(.hidden)
-            #else
-            ToolbarItem(placement: .primaryAction) {
-                Button("New outcome", systemImage: "square.and.pencil") { sheet = .newOutcome }
-                    .disabled(!store.isLoaded)
-            }
-            ToolbarItem(placement: .primaryAction) {
-                Menu("More", systemImage: "ellipsis") {
-                    Button("Developers", systemImage: "person.2") { sheet = .team }
-                    Button("Connections", systemImage: "link") { sheet = .connections }
-                    Button("Settings", systemImage: "gearshape") { sheet = .settings }
-                    if store.isPlanning {
-                        Button("Cancel Planning", systemImage: "stop.fill") { store.cancelPlanning() }
-                    }
-                }
-            }
             #endif
         }
         #if os(macOS)
@@ -146,7 +136,7 @@ struct StudioRootView: View {
         .searchable(text: $search, prompt: "Search outcomes")
         #endif
         .sheet(item: $sheet) { item in
-            StudioSheetView(kind: item, store: store, connections: connections, chatGPT: chatGPT)
+            StudioSheetView(kind: item, store: store, connections: connections, chatGPT: chatGPT, runtime: runtime)
         }
         .onChange(of: destination) { _, _ in selectedTaskID = nil }
         .onChange(of: search) { _, query in
@@ -164,6 +154,31 @@ struct StudioRootView: View {
         message: { Text(store.failure ?? "") }
     }
 
+    #if os(iOS)
+    @ToolbarContentBuilder private var mobileControls: some ToolbarContent {
+            ToolbarItem(placement: .primaryAction) {
+                Button("New outcome", systemImage: "square.and.pencil") { sheet = .newOutcome }
+                    .disabled(!store.isLoaded)
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Menu("More", systemImage: "ellipsis") {
+                    Button("Developers", systemImage: "person.2") { sheet = .team }
+                    Button("Connections", systemImage: "link") { sheet = .connections }
+                            Button("Developer runtime", systemImage: "terminal") { sheet = .runtime }
+                    Button("Settings", systemImage: "gearshape") { sheet = .settings }
+                    if runtime.state.connected {
+                        Button("Pause Team", systemImage: "pause.fill") { Task { do { _ = try await runtime.stop() } catch { runtime.reportError(error) } } }
+                    } else if runtime.hasRuntime {
+                        Button("Restart developers", systemImage: "play.fill") { Task { do { _ = try await runtime.restart() } catch { runtime.reportError(error) } } }
+                    }
+                    if store.isPlanning {
+                        Button("Cancel Planning", systemImage: "stop.fill") { store.cancelPlanning() }
+                    }
+                }
+            }
+    }
+    #endif
+
     @ViewBuilder private var workspaceColumns: some View {
         #if os(macOS)
         HSplitView {
@@ -179,12 +194,15 @@ struct StudioRootView: View {
         #else
         NavigationSplitView(columnVisibility: $columns, preferredCompactColumn: $compactColumn) {
             sidebar.navigationSplitViewColumnWidth(min: 230, ideal: 258, max: 300)
+                .toolbar { mobileControls }
         } content: {
             conversationColumn
                 .navigationTitle(outcome.map { String($0.text.prefix(55)) } ?? "Engineering")
                 .navigationSplitViewColumnWidth(min: 340, ideal: 610)
+                .toolbar { mobileControls }
         } detail: {
             detailColumn.navigationSplitViewColumnWidth(min: 300, ideal: 368, max: 420)
+                .toolbar { mobileControls }
         }
         .navigationSplitViewStyle(.balanced)
         #endif
@@ -201,7 +219,7 @@ struct StudioRootView: View {
                     Button("Retry") { Task { await store.load() } }
                 }
             } else if let outcome {
-                EngineeringRoomView(store: store, connections: connections, outcome: outcome, selectedTaskID: selectedTaskID,
+                EngineeringRoomView(store: store, connections: connections, runtime: runtime, outcome: outcome, selectedTaskID: selectedTaskID,
                                     initialDraft: initialDraft, openConnections: { sheet = .connections }) { taskID in
                     selectedTaskID = taskID
                     // A repeated selection must reopen the detail after Back,
@@ -217,7 +235,8 @@ struct StudioRootView: View {
     private var detailColumn: some View {
         Group {
             if let selectedTask, let outcome {
-                TaskDetailView(task: selectedTask, issueBinding: store.issueBinding(outcomeID: outcome.id, taskID: selectedTask.id))
+                TaskDetailView(task: selectedTask, issueBinding: store.issueBinding(outcomeID: outcome.id, taskID: selectedTask.id),
+                               record: runtime.record(outcomeID: outcome.id, taskID: selectedTask.id), runtime: runtime)
             }
             else {
                 ContentUnavailableView("Select a task", systemImage: "sidebar.right",
@@ -246,7 +265,7 @@ struct StudioRootView: View {
                         Image(systemName: "person.2").font(.system(size: 22)).frame(width: 26)
                         VStack(alignment: .leading, spacing: 7) {
                             Text("Developers").fixedSize(horizontal: true, vertical: false)
-                            Label("0 connected", systemImage: "circle").font(StudioTypography.caption).foregroundStyle(.secondary).lineLimit(1)
+                            Label(runtime.state.connected ? "\(runtime.availableCount) available" : "Offline", systemImage: runtime.state.connected ? "circle.fill" : "circle").font(StudioTypography.caption).foregroundStyle(.secondary).lineLimit(1)
                         }.layoutPriority(1)
                         Spacer(minLength: 0)
                         Text(Specialty.allCases.count, format: .number).foregroundStyle(.secondary)
@@ -301,7 +320,7 @@ struct StudioRootView: View {
                 } label: {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(item.text).font(.headline)
-                        Text(item.plan.map { "\($0.tasks.count) tasks · Not dispatched" } ?? "Awaiting a plan")
+                        Text(runtime.outcomeStatus(item))
                             .font(.caption).foregroundStyle(.secondary)
                     }.padding(.vertical, 6)
                 }.buttonStyle(.plain)
@@ -336,15 +355,17 @@ private struct StudioSheetView: View {
     let store: StudioStore
     let connections: ServiceConnections
     let chatGPT: ChatGPTConnection
+    let runtime: DeveloperRuntimeConnection
     @Environment(\.dismiss) private var dismiss
     var body: some View {
         NavigationStack {
             Group {
                 switch kind {
                 case .newOutcome: NewOutcomeView(store: store)
-                case .team: TeamView()
-                case .settings: StudioSettingsView(store: store, connections: connections, chatGPT: chatGPT)
+                case .team: TeamView(runtime: runtime)
+                case .settings: StudioSettingsView(store: store, connections: connections, chatGPT: chatGPT, runtime: runtime)
                 case .connections: ServiceConnectionsView(connections: connections, store: store)
+                case .runtime: DeveloperRuntimeView(runtime: runtime, account: chatGPT)
                 }
             }
             .toolbar {

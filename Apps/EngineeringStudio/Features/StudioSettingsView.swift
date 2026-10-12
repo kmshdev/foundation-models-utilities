@@ -4,6 +4,7 @@ struct StudioSettingsView: View {
     let store: StudioStore
     let connections: ServiceConnections
     let chatGPT: ChatGPTConnection
+    var runtime: DeveloperRuntimeConnection = DeveloperRuntimeConnection()
     var body: some View {
         Form {
             Section {
@@ -38,9 +39,13 @@ struct StudioSettingsView: View {
                 Text("Use your explicit order, urgent defects, dependency blockers, then Linear priority.")
                 Text("Work autonomously within the stated scope. Ask blocking questions together and wait for their answers. Preserve context and report evidence at handoffs.")
             }
-            Section("Unavailable connections") {
-                Label("Cloudflare developer runtime", systemImage: "cloud")
-                Label("Task execution and acceptance verification", systemImage: "checkmark.seal")
+            Section("Developer execution") {
+                NavigationLink { DeveloperRuntimeView(runtime: runtime, account: chatGPT) } label: {
+                    Label("Developer runtime", systemImage: "terminal")
+                }
+                LabeledContent("Availability", value: runtime.status)
+                Text("Newly prepared plans run automatically while developers are connected. Existing plans can be run from their conversation.")
+                    .font(.callout).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped).scrollContentBackground(.hidden)

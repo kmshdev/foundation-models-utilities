@@ -73,6 +73,7 @@ final class ServiceConnections {
     private(set) var githubTruncated = false
     private(set) var linearTruncated = false
     private(set) var publishingOutcomeID: UUID?
+    private(set) var publishingExecution = false
     private(set) var lastPublicationOutcomeID: UUID?
     private(set) var publicationStatus: String?
     private(set) var publicationError: String?
@@ -111,7 +112,7 @@ final class ServiceConnections {
     }
 
     @discardableResult func connectGitHub(token: String) async -> Bool {
-        guard !refreshingGitHub else { return false }
+        guard !refreshingGitHub, !publishingExecution else { return false }
         let value = token.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty else { return false }
         do {
@@ -182,7 +183,7 @@ final class ServiceConnections {
     }
 
     func disconnectGitHub() async {
-        guard !refreshingGitHub else { return }
+        guard !refreshingGitHub, !publishingExecution else { return }
         do {
             try credentialStore.write(nil, account: "github")
             githubToken = nil; hasGitHubCredential = false; githubCredentialError = nil
@@ -202,6 +203,19 @@ final class ServiceConnections {
             linearError = nil; linearStatus = "Not connected"
             lastPublicationOutcomeID = nil; publicationStatus = nil; publicationError = nil
         } catch { linearError = error.localizedDescription }
+    }
+
+    func publish(record: ExecutionRecord, parents: [ExecutionPullRequestReceipt]) async throws -> ExecutionPullRequestReceipt {
+        guard !publishingExecution else { throw ExecutionPublicationError.alreadyPublishing }
+        guard let githubToken else {
+            throw ExecutionError.unavailable("Add a GitHub token in Connections on the execution host, scoped to this repository with Contents and Pull requests write access.")
+        }
+        publishingExecution = true
+        defer { publishingExecution = false }
+        let publisher = ExecutionGitHubPublisher(token: githubToken, transport: transport, publishedParents: parents)
+        let receipt = try await publisher.publish(record: record)
+        await refreshGitHub()
+        return receipt
     }
 
     func publishPlan(for outcome: Outcome, store: StudioStore) async {

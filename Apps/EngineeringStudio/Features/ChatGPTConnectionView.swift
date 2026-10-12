@@ -63,7 +63,7 @@ struct ChatGPTConnectionView: View {
             if connection.isSignedIn {
                 Section("Models") {
                     Picker("Planning model", selection: Binding(
-                        get: { connection.selectedModel }, set: { connection.selectModel($0) }
+                        get: { connection.selectedModel }, set: { value in Task { await connection.selectModel(value) } }
                     )) {
                         Text("Choose a model").tag(Optional<String>.none)
                         ForEach(connection.models) { model in

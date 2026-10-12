@@ -1,6 +1,6 @@
 # Personal ChatGPT access: supported Swift path
 
-Research checkpoint, 2026-10-11. This is an implementation contract, not a claim that sign-in is already working in Engineering Studio.
+Research and implementation checkpoint, 2026-10-12. Direct native authentication, catalog/Responses transport and the Foundation Models adapter are implemented. Apple-platform tests exercise the actual frameworks with deterministic accounts and transports; live browser consent and personal subscription inference are not yet verified.
 
 OpenAI documents direct OAuth and HTTP/SSE Sign in with ChatGPT protocols for open-source local and self-hosted software. Implementing those language-independent protocols in Swift is our engineering choice; a personal Mac runner, Node authentication service or Codex subprocess is not a protocol requirement. The DevKit supplies an optional Node SDK and example app. Subscription access must not be replaced with a separately billed API key. The documented plan-sharing route is currently a preview.
 
@@ -20,11 +20,11 @@ Use OAuth Bearer authorization for `GET https://api.openai.com/v1/models`. This 
 
 Use `POST https://api.openai.com/v1/responses` with the selected slug, input, `store: false` and `stream: true`. Accumulate SSE `response.output_text.delta`; success requires `response.completed`. Failed, incomplete, interrupted and usage-limit endings must remain visible even after some text arrived. Retain conversation history locally. Do not send unsupported fields such as `previous_response_id`, `temperature`, `top_p`, `max_output_tokens` or `metadata` on this path.
 
-Hosted MCP/connectors and `tool_search` are not supported by this preview. Function/custom tools must be grouped in namespaces or supplied through `additional_tools` input items. Our integration will execute GitHub and Linear tools through Swift clients or a connected Swift execution runtime. As a project requirement, the Foundation Models adapter must implement `LanguageModel` and preserve session/model error distinctions; the existing chat-completions adapter is not a substitute for the Responses transport.
+Hosted MCP/connectors and `tool_search` are not supported by this preview. Function/custom tools must be grouped in namespaces or supplied through `additional_tools` input items. The app executes GitHub and Linear through Swift service clients and a connected Swift developer runtime. As a project requirement, the Foundation Models adapter must implement `LanguageModel` and preserve session/model error distinctions; the existing chat-completions adapter is not a substitute for the Responses transport.
 
 ## Platform and hosting boundaries
 
-The documented OSS callback is HTTP loopback. Apple's `ASWebAuthenticationSession.Callback` documents custom-scheme and associated-domain HTTPS callbacks; that does not establish an HTTP-loopback callback for the iPhone browser session. A Swift Network-framework listener/browser experiment on a real iPhone is needed to verify foreground/background lifecycle behavior. Do not invent a custom-scheme callback accepted by OpenAI. This experiment does not block portable registration, token, catalog, streaming or model-adapter implementation.
+The documented OSS callback is HTTP loopback. Apple's `ASWebAuthenticationSession.Callback` documents custom-scheme and associated-domain HTTPS callbacks; that does not establish an HTTP-loopback callback for the iPhone browser session. The app uses an in-app `ASWebAuthenticationSession` browser with no custom callback scheme and owns the literal loopback callback with `NWListener`. Real iPhone browser consent is still needed to verify foreground/background lifecycle behavior; native listener/cryptography tests and an actual iOS app launch have passed. Do not invent a custom-scheme callback accepted by OpenAI. This experiment does not block portable registration, token, catalog, streaming or model-adapter implementation.
 
 For an authorized self-hosted VM, follow OpenAI's secure registration-transfer flow with a distinct host identity and let the VM own refresh rotation. This is not Mac-specific. A paid or third-party remotely hosted product has a different onboarding path; do not assume OSS permission covers every deployment. Cloudflare remains a preference only where the runtime and this Swift implementation fit.
 

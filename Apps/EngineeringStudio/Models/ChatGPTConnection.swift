@@ -10,11 +10,12 @@ final class ChatGPTConnection {
     private(set) var selectedModel: String?
     private(set) var catalogState: ChatGPTCatalogState = .notLoaded
     private(set) var isSigningIn = false
+    private(set) var isChangingAccountOrModel = false
     private(set) var isRefreshing = false
     private(set) var error: String?
     private(set) var signOutStatus: String?
     var isSignedIn: Bool { activeAccount?.isSignedIn == true && activeAccount?.planUsageEnabled == true }
-    var isReadyForPlanning: Bool { isSignedIn && catalogState == .available && models.contains { $0.slug == selectedModel } }
+    var isReadyForPlanning: Bool { !isChangingAccountOrModel && isSignedIn && catalogState == .available && models.contains { $0.slug == selectedModel } }
     var status: String {
         if isSigningIn { return "Signing in…" }
         if isRefreshing { return "Loading models…" }
@@ -29,6 +30,7 @@ final class ChatGPTConnection {
     @ObservationIgnored private let authenticator: ChatGPTNativeAuthenticator
     @ObservationIgnored private var didLoad = false
     @ObservationIgnored private var generation = UUID()
+    @ObservationIgnored private var beforeAccountChange: (@MainActor () async -> Void)?
 
     /// Construction creates adapters only; credential reads begin with load().
     init(session: ChatGPTSession = ChatGPTAuthenticationFactory.makeSession(),
@@ -36,6 +38,10 @@ final class ChatGPTConnection {
         self.session = session
         responsesClient = client ?? ChatGPTResponsesClient(tokenProvider: session)
         authenticator = ChatGPTNativeAuthenticator(session: session)
+    }
+
+    func configureBeforeAccountChange(_ action: @escaping @MainActor () async -> Void) {
+        beforeAccountChange = action
     }
 
     func load() async {
@@ -53,12 +59,14 @@ final class ChatGPTConnection {
     }
 
     func signIn(addAccount: Bool = false, enablePlanUsage: Bool = false) async {
-        guard !isSigningIn, !isRefreshing else { return }
+        guard !isSigningIn, !isRefreshing, !isChangingAccountOrModel else { return }
         generation = UUID()
         let expected = generation
-        isSigningIn = true; error = nil; signOutStatus = nil
-        defer { if generation == expected { isSigningIn = false } }
+        isSigningIn = true; isChangingAccountOrModel = true; error = nil; signOutStatus = nil
+        defer { if generation == expected { isSigningIn = false; isChangingAccountOrModel = false } }
         do {
+            await beforeAccountChange?()
+            guard generation == expected else { return }
             _ = try await authenticator.signIn(accountID: addAccount ? nil : activeAccount?.id,
                                               enablePlanUsage: enablePlanUsage)
             guard generation == expected else { return }
@@ -73,13 +81,18 @@ final class ChatGPTConnection {
         authenticator.cancel()
         isSigningIn = false
         isRefreshing = false
+        isChangingAccountOrModel = false
     }
 
     func selectAccount(_ id: String) async {
-        guard !isSigningIn, !isRefreshing, id != activeAccount?.id else { return }
+        guard !isSigningIn, !isRefreshing, !isChangingAccountOrModel, id != activeAccount?.id else { return }
+        isChangingAccountOrModel = true
         generation = UUID()
         let expected = generation
+        defer { if generation == expected { isChangingAccountOrModel = false } }
         do {
+            await beforeAccountChange?()
+            guard generation == expected else { return }
             try await session.selectAccount(id: id)
             guard generation == expected else { return }
             models = []; selectedModel = nil; catalogState = .notLoaded; error = nil; signOutStatus = nil
@@ -113,17 +126,27 @@ final class ChatGPTConnection {
         }
     }
 
-    func selectModel(_ slug: String?) {
-        guard let slug, models.contains(where: { $0.slug == slug }) else { return }
+    func selectModel(_ slug: String?) async {
+        guard !isSigningIn, !isRefreshing, !isChangingAccountOrModel, let slug, slug != selectedModel, models.contains(where: { $0.slug == slug }) else { return }
+        let expected = generation
+        isChangingAccountOrModel = true
+        defer { if generation == expected { isChangingAccountOrModel = false } }
+        await beforeAccountChange?()
+        guard generation == expected, models.contains(where: { $0.slug == slug }) else { return }
         selectedModel = slug
         saveModelPreference()
     }
 
     func signOut() async {
+        guard !isChangingAccountOrModel || isSigningIn else { return }
         cancelSignIn()
+        isChangingAccountOrModel = true
         isRefreshing = false
         let expected = generation
+        defer { if generation == expected { isChangingAccountOrModel = false } }
         do {
+            await beforeAccountChange?()
+            guard generation == expected else { return }
             let revoked = try await session.signOut()
             guard generation == expected else { return }
             models = []; selectedModel = nil; catalogState = .notLoaded; error = nil
@@ -139,7 +162,7 @@ final class ChatGPTConnection {
     }
 
     func requireSelectedModel() throws -> String {
-        guard isSignedIn else { throw ChatGPTConnectionError.notConnected }
+        guard !isChangingAccountOrModel, isSignedIn else { throw ChatGPTConnectionError.notConnected }
         guard catalogState == .available else { throw ChatGPTConnectionError.modelAccessUnavailable }
         guard let selectedModel, models.contains(where: { $0.slug == selectedModel }) else {
             throw ChatGPTConnectionError.noModelSelected

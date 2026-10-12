@@ -24,6 +24,8 @@ private final class CaptureDelegate: NSObject, NSApplicationDelegate {
                 try await checkSubscriptionModel()
                 try await checkChatGPTAuthentication()
                 try await checkChatGPTConnection()
+                try await checkRemoteExecution()
+                try await checkDeveloperRuntimeConnection()
                 let output = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
                 try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
                 var workspace = Workspace()
