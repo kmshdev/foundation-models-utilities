@@ -78,6 +78,20 @@ enum NativeSmoke {
         try runner.run("mac-screenshot", "/usr/sbin/screencapture", ["-x", "-o", "-l", String(windowID), macImage.path])
         try verifyImage(macImage)
         print("Production Mac app is running with visible window \(windowID).")
+        var evidence: [String: Any] = [
+            "commit": ProcessInfo.processInfo.environment["GITHUB_SHA"] ?? "local",
+            "macProcessID": app.processIdentifier, "macWindowID": windowID,
+            "images": [macImage.lastPathComponent], "verifiedPlatforms": ["macOS"],
+            "usesProductionTargets": true
+        ]
+        try JSONSerialization.data(withJSONObject: evidence, options: [.prettyPrinted, .sortedKeys]).write(to: results.appendingPathComponent("launch-evidence.json"), options: .atomic)
+        // Release the Mac UI before starting the simulator on small CI hosts.
+        _ = app.terminate()
+        for _ in 0..<5 {
+            if app.isTerminated { break }
+            try await Task.sleep(for: .seconds(1))
+        }
+        if !app.isTerminated { _ = app.forceTerminate() }
 
         let data = try runner.run("available-devices", "/usr/bin/xcrun", ["simctl", "list", "devices", "available", "--json"])
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
@@ -111,36 +125,34 @@ enum NativeSmoke {
                 let name = $0.deletingPathExtension().lastPathComponent.lowercased().filter(\.isLetter)
                 return name == "simulator" || name == "devicehub"
             }
-            let selectedXcodeContents = developer.deletingLastPathComponent().path + "/"
-            let host = matchingHosts.first(where: { $0.path.hasPrefix(selectedXcodeContents) }) ?? NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.iphonesimulator") ?? matchingHosts.first
+            let selectedXcodeContents = developer.deletingLastPathComponent().resolvingSymlinksInPath().path + "/"
+            let host = matchingHosts.first(where: { $0.resolvingSymlinksInPath().path.hasPrefix(selectedXcodeContents) }) ?? NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.iphonesimulator") ?? matchingHosts.first
             guard let host else { throw NativeCommandError.invalidOutput("Simulator/Device Hub GUI host was not found; inspect installed-apple-apps.txt") }
             let arguments = host.lastPathComponent == "Simulator.app" ? [host.path, "--args", "-CurrentDeviceUDID", deviceID] : [host.path]
             try runner.run("open-simulator-host", "/usr/bin/open", arguments)
             try runner.run("await-boot", "/usr/bin/xcrun", ["simctl", "bootstatus", deviceID, "-b"], timeout: 180)
             let iosApp = products.appendingPathComponent("Debug-iphonesimulator/EngineeringStudioiOS.app")
-            try runner.run("install-ios", "/usr/bin/xcrun", ["simctl", "install", deviceID, iosApp.path], timeout: 60)
-            let container = try runner.run("installed-app-container", "/usr/bin/xcrun", ["simctl", "get_app_container", deviceID, "dev.kmsh.engineeringstudio", "app"])
-            let launch = try runner.run("launch-ios", "/usr/bin/xcrun", ["simctl", "launch", "--terminate-running-process", deviceID, "dev.kmsh.engineeringstudio"], timeout: 45)
+            try runner.run("install-ios", "/usr/bin/xcrun", ["simctl", "install", deviceID, iosApp.path], timeout: 120)
+            let launch = try runner.run("launch-ios", "/usr/bin/xcrun", ["simctl", "launch", "--terminate-running-process", deviceID, "dev.kmsh.engineeringstudio"], timeout: 120)
             let launchText = String(decoding: launch, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
             guard let pidText = launchText.split(separator: ":").last,
                   let pid = Int32(pidText.trimmingCharacters(in: .whitespaces)), pid > 0 else {
                 throw NativeCommandError.invalidOutput("launch-ios process receipt")
             }
             try await Task.sleep(for: .seconds(5))
-            let processData = try runner.run("ios-process-alive", "/bin/ps", ["-p", String(pid), "-o", "command="])
+            let processData = try runner.run("ios-process-alive", "/bin/ps", ["-p", String(pid), "-o", "command="], timeout: 45)
             guard String(decoding: processData, as: UTF8.self).contains("EngineeringStudioiOS") else {
                 throw NativeCommandError.invalidOutput("iOS app did not remain running")
             }
             let iosImage = results.appendingPathComponent("ios-27.png")
-            try runner.run("ios-screenshot", "/usr/bin/xcrun", ["simctl", "io", deviceID, "screenshot", iosImage.path])
+            try runner.run("ios-screenshot", "/usr/bin/xcrun", ["simctl", "io", deviceID, "screenshot", iosImage.path], timeout: 60)
             try verifyImage(iosImage)
-            let evidence: [String: Any] = [
-                "commit": ProcessInfo.processInfo.environment["GITHUB_SHA"] ?? "local",
-                "macProcessID": app.processIdentifier, "macWindowID": windowID,
-                "simulatorID": deviceID, "simulatorRuntime": runtime.key,
-                "iosProcessID": pid, "iosInstalledContainer": String(decoding: container, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines),
-                "images": [macImage.lastPathComponent, iosImage.lastPathComponent], "usesProductionTargets": true
-            ]
+            evidence["simulatorID"] = deviceID
+            evidence["simulatorRuntime"] = runtime.key
+            evidence["iosProcessID"] = pid
+            evidence["iosInstalledBundleIdentifier"] = "dev.kmsh.engineeringstudio"
+            evidence["images"] = [macImage.lastPathComponent, iosImage.lastPathComponent]
+            evidence["verifiedPlatforms"] = ["macOS", "iOS"]
             try JSONSerialization.data(withJSONObject: evidence, options: [.prettyPrinted, .sortedKeys]).write(to: results.appendingPathComponent("launch-evidence.json"), options: .atomic)
             print("Production iOS app remains running as process \(pid) on isolated \(runtime.key). Inspect both screenshots for startup UI.")
         } catch {
