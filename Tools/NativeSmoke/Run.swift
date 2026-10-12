@@ -129,7 +129,7 @@ enum NativeSmoke {
             let host = matchingHosts.first(where: { $0.resolvingSymlinksInPath().path.hasPrefix(selectedXcodeContents) }) ?? NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.iphonesimulator") ?? matchingHosts.first
             guard let host else { throw NativeCommandError.invalidOutput("Simulator/Device Hub GUI host was not found; inspect installed-apple-apps.txt") }
             let arguments = host.lastPathComponent == "Simulator.app" ? [host.path, "--args", "-CurrentDeviceUDID", deviceID] : [host.path]
-            try runner.run("open-simulator-host", "/usr/bin/open", arguments)
+            try runner.run("open-simulator-host", "/usr/bin/open", arguments, timeout: 90)
             try runner.run("await-boot", "/usr/bin/xcrun", ["simctl", "bootstatus", deviceID, "-b"], timeout: 180)
             let iosApp = products.appendingPathComponent("Debug-iphonesimulator/EngineeringStudioiOS.app")
             try runner.run("install-ios", "/usr/bin/xcrun", ["simctl", "install", deviceID, iosApp.path], timeout: 120)
