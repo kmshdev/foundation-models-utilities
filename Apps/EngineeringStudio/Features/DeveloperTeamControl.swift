@@ -24,6 +24,7 @@ struct DeveloperTeamControl: View {
             Label(title, systemImage: symbol)
                 .font(StudioTypography.label).padding(.horizontal, 6).frame(minHeight: 28)
         }
+        .labelStyle(.titleAndIcon)
         .buttonStyle(.glass).tint(tint)
         .disabled(runtime.isControlling || runtime.isConnecting || runtime.isDisconnecting)
         .help(runtime.state.connected ? "Pause developers and retain their context" : "Connect or restart the developer team")
