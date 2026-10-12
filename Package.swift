@@ -31,6 +31,7 @@ let package = Package(
     .target(
       name: "FoundationModelsUtilities",
       dependencies: [],
+      path: "Apps/EngineeringStudio/Core/FoundationModelsUtilities",
       swiftSettings: [
         .enableExperimentalFeature("InternalImportsByDefault"),
         .enableExperimentalFeature("NonisolatedNonsendingByDefault"),

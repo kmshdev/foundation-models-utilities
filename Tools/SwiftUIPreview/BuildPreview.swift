@@ -52,7 +52,7 @@ let library = output.appendingPathComponent("libEngineeringCore.a").path
 try run(["swiftc"] + common + ["-parse-as-library", "-emit-library", "-static", "-emit-module", "-module-name", "EngineeringCore",
         "-emit-module-path", output.appendingPathComponent("EngineeringCore.swiftmodule").path, "-o", library]
         + sources("Packages/EngineeringCore/Sources/EngineeringCore"))
-let utilitiesSources = try sources("Sources/FoundationModelsUtilities")
+let utilitiesSources = try sources("Apps/EngineeringStudio/Core/FoundationModelsUtilities")
 let utilitiesFlags = ["-enable-experimental-feature", "InternalImportsByDefault",
                       "-enable-experimental-feature", "NonisolatedNonsendingByDefault",
                       "-enable-upcoming-feature", "MemberImportVisibility"]
