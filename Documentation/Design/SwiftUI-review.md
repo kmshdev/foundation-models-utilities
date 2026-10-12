@@ -1,83 +1,74 @@
-# SwiftUI and product review — 2026-10-11
+# SwiftUI and product review — 2026-10-12
 
-Status: UI/state improvements and full SDK 27 builds are complete. Connected-service and end-to-end product acceptance remain outstanding. See [toolchain evidence](../Engineering/Toolchain.md).
+This review covers app source and current native screenshots. It preserves the approved three-pane design and records concrete UX corrections. The corrections are integrated at `e64b613`; native regressions and seven captures passed. Source changes, builds, rendered captures, assistive-technology interaction and live account behavior are separate evidence.
 
-## Product and information architecture
+## Product and layout
 
-Engineering Studio is a personal engineering workspace for one person directing eight specialists. The primary action is sending an outcome or follow-up to the coordinator. The information hierarchy is outcomes → conversation and assignments → selected task evidence. Connection state must remain visible and truthful. Planned work is never represented as running work.
+Engineering Studio gives one person an outcome-based conversation with a coordinator and eight focused specialists. Sending an outcome/follow-up is the primary action. Availability, independent scope, handoffs and evidence belong beside the conversation.
 
-The accepted three-pane composition remains the foundation. On Mac, an inset `HSplitView` preserves the reference's continuous window and independently resizable content panes. This is a deliberate layout choice, with a cost: it does not supply the standard sidebar navigation, collapse or keyboard behavior of `NavigationSplitView`. Those behaviors need native interaction validation before release. On iOS, `NavigationSplitView` provides selection-driven compact navigation and restores the three columns when space permits.
+Mac uses a continuous window, unified toolbar and three inset `HSplitView` panes. iPhone/iPad use `NavigationSplitView` with sidebar/content/detail selections and an explicit preferred compact column. Selecting the same task after returning must reopen details. Detail identity must include outcome and task so unrelated tasks with the same ID cannot share action/disclosure state.
 
-`sidebarAdaptable` was evaluated. This product currently has one primary workspace, not several peer top-level destinations; adding a TabView would duplicate navigation. Use it if future product structure introduces true peer destinations. Settings and new-outcome creation are bounded flows, not permanent tabs. Mac preferences now use the standard `Settings` scene; iOS retains a settings sheet.
+The Mac container preserves the accepted rounded composition. A native selectable List supplies sidebar selection; a toolbar button and Cmd-Control-S toggle its visibility. Divider resizing and keyboard traversal still require interaction evidence. Narrow conversations stack assignment metadata; wide windows constrain the conversation and composer to 760 points. No genuine peer navigation hierarchy currently justifies a tab bar or `.sidebarAdaptable`.
 
-## Visual system
+## Design system
 
-The reference establishes composition and hierarchy. The current refinement applies the requested neutral-first design principles instead of hard-coding an illustrated blue lighting treatment.
+The [design system](README.md) defines native typography, neutral surfaces, functional color, SF Symbols and 8/12/16/24/32-point spacing. Title2, headline, subheadline, callout and caption provide hierarchy. Mac conversation body is 15 points; iOS body is semantic. Metadata stays secondary without hiding blockers/errors.
 
-- **Layout:** unified window toolbar; outcome sidebar; conversation/tasks and persistent composer; contextual task details. Content and toolbar share a background. Sections align to a common inset rather than adding dashboard widgets.
-- **Typography:** native system fonts. Title uses title2 semibold, section headings headline, labels subheadline semibold, supporting copy callout and caption. Conversation body is 15 points on Mac and semantic body on iOS. No decorative typefaces or all-caps navigation.
-- **Color:** system foreground/background and semantic materials, an accent for selection and Send, green for prepare/run intent, amber for cancel/pause intent. Labels and symbols carry the same information independently of color. Production follows the system appearance.
-- **Components:** native segmented picker, native glass buttons, SF Symbols, standard multiline input, plain content rows, disclosure groups for supporting context. Task/owner/status uses columns when space permits and stacked rows at narrower or accessibility sizes. Paths remain complete and selectable.
-- **Materials:** thin standard material separates content panes; regular standard material supports the composer. Interactive controls use Liquid Glass. The composer no longer nests glass inside a glass container. No custom glow, simulated reflections or decorative gradients.
-- **Interaction:** use native control hover, focus, press and system presentation behavior. Cmd-N creates an outcome, Cmd-Return sends, and the standard Mac Settings command uses Cmd-comma. The composer retains focus after a successful send. No new decorative animation, looping animation or forced transition is introduced.
-- **Spacing:** shared 8, 12, 16, 24 and 32 point roles; 12 point controls and 20 point containers. Primary content targets use at least 44 points; native toolbar controls retain their platform sizing. System SF Symbol badges scale with text metrics.
+Structural content uses standard materials; actions use Liquid Glass. Thin panels and a regular-material composer express hierarchy; glass toolbar groups/buttons express interaction. Appearance and contrast remain system-driven. Message metadata and team status now reflow at accessibility sizes; task rows and composer already have adaptive variants. Labels/symbols supplement functional color; decorative images are hidden from accessibility.
 
-## SwiftUI review coverage
+## Review and corrections
 
-| Area | Finding and disposition |
+| Area | Source finding and disposition |
 | --- | --- |
-| Invalidation and Observation | Composer text formerly lived on the entire conversation view. Each outcome now owns an independently observed `OutcomeDraft`; typing no longer reads or writes the workspace history. The composer is a separate view. Filtering the growing workspace still needs Instruments measurement with realistic history before further caching/pagination work. |
-| State ownership | Store owns workspace and per-outcome session drafts; views own ephemeral selection, disclosures and presentation. Drafts survive switching outcomes. Sending clears only a successfully accepted draft. Failed load can retry. Current-revision save conflicts now surface rather than silently disappearing. |
-| Modern APIs | `@Observable`, `@Bindable` at the editable leaf, `.task`, two-value `onChange`, `NavigationStack`, `NavigationSplitView`, Settings, native glass button styles, SF Symbols and selectable text. Both production targets now compile with Xcode 27 and Swift 6.4, including the current state initializers. |
-| Composition | Removed unused duplicate work-list and plan-detail screens. Extracted `OutcomeComposer` and `TaskSummaryView`; stable task IDs drive rows. View helpers remain for small repeated sections rather than extracting every modifier. |
-| Layout and large screens | Three pane widths are bounded to a usable Mac minimum. A smaller Mac conversation falls back to stacked task metadata. Accessibility text sizes force stacked rows and composer controls. iOS uses the native compact-column navigation path. Device/foldable behavior is not established by Mac screenshots. |
-| Sheets and navigation | Identifiable sheet state prevents competing presentation flags. Mac Settings is a scene. New Outcome owns unsaved form text and dismisses only after successful submission. Task inspection remains inline. |
-| Toolbar and window | Unified native Mac toolbar with flexible trailing action grouping; content minimum size protects the pane layout. Native controls provide system behavior. The preview host separately typechecks the production Mac scene with the installed SDK. |
-| Basic, transition and advanced animation | No custom animation is necessary for the current primary workflow. No broad implicit animation is attached to workspace mutations. Native navigation and control effects remain. Reduced Motion and live keyboard/focus behavior still need interaction testing. No phase/keyframe/geometry animation was added solely to exercise an API. |
-| Text and styled editing | Conversation and code-path text is selectable; messages are plain text. A rich-text editor/AttributedString document model would add unsupported product semantics and is not introduced. Long scope paths are no longer shortened to a misleading suffix. |
-| Deprecated APIs | No new NavigationView, legacy one-parameter onChange or custom raster icons. No speculative SDK 27 replacements are applied without a working target compiler. Soft-deprecation guidance is a review input, not permission to break the available compiler. |
-| Liquid Glass | Standard material for structural content; native glass for actions. Removed nested glass and decorative background lighting. System contrast and appearance drive foregrounds/borders. Native rendering must still be verified with Reduce Transparency and target-device conditions. |
+| Observation/invalidation | Stores, account connections and runtime use `@Observable`. `OutcomeComposer` uses an editable `@Bindable` draft leaf; typing is isolated from conversation filtering. Runtime is a compound snapshot, so changed receipts can invalidate readers of that property. No Instruments evidence establishes a performance improvement or need for additional caches. |
+| State flow | Workspace, questions, plans and drafts belong to the store; per-window selection, sheets and disclosures belong to views. Ordered persistence, stale-plan rejection and cancellation are implemented. New-outcome drafts use stable owned state and backward-compatible durable workspace storage; creation and draft clearing share one snapshot. |
+| Execution history | `ExecutionResultsView` requires exact task equality for current progress. Unmatched receipts remain in Previous executions with an explanation. `ExecutionResultRow` shows observed status, specialty, actual local commit, summary and blocker without invented tests/PRs. Runtime reads stay in assignment, result, control and inspector leaf views. |
+| Team presence | `TeamMemberRow` wraps text and distinguishes disconnected, available, working and stale presence. Stale active-task observations no longer claim current work. Configured specialties and actual availability remain separate. |
+| Runtime controls | Team pause is independent of planning cancellation, with Restart/Connect exposed when appropriate. Single-flight controls reject conflicting actions and fence stale snapshot/delivery replies. Native checks cover repeated Pause, conflicting Restart, delayed snapshots, failed reads and local shutdown. Catalog replacement also awaits the account/model shutdown hook before publishing another selected model. |
+| Setup discoverability | Explicit first-launch New outcome and contextual planning-model/runtime actions lead to existing native forms. The Mac toolbar retains the team control's visible intent label. |
+| Conversation scroll | A Bool geometry threshold and user scroll phase preserve reading position. Incoming messages follow while the user is near the bottom; otherwise a new-message action offers an explicit return. Sending reveals the latest content. Keyboard and repeated-update behavior need interaction checks. |
+| Navigation/sheets | Identifiable routes prevent competing sheets. Mac Settings is a scene; bounded creation/iOS settings use native presentation. Flows own dismissal. Durable new-outcome drafts protect text without adding routine confirmation gates. Task inspection stays in the hierarchy. |
+| Toolbar/window | Unified native toolbar, flexible action grouping and platform controls preserve the continuous container. The fixed 116-point title offset is removed. Shortcuts are Cmd-N, Cmd-Return, Cmd-Control-S and Cmd-comma. Divider resizing, overflow, focus and multi-window behavior require interaction evidence. |
+| Basic/transition/advanced animation | Native controls/navigation supply purposeful feedback. There is no broad implicit animation on workspace mutations or decorative phase/keyframe animation. Explicit scroll animation must be scoped and disabled for Reduce Motion. System effects alone do not establish a complete motion audit. |
+| Styled text/editing | Instructions are plain multiline text. Conversation, paths and command output are selectable. A rich-text `AttributedString` document model would add unrequested semantics; API availability is not a reason to replace the input. |
+| Modern SDK APIs | Observation, `.task`, two-value `onChange`, `NavigationStack`, `NavigationSplitView`, Settings, `ToolbarSpacer`, shared toolbar background visibility, native glass styles, `GlassEffectContainer` and `ViewThatFits` are used. SDK 27 builds validate availability. New APIs should serve an actual behavior. |
+| Deprecated/soft-deprecated APIs | No hard-deprecated SwiftUI API was found in the reviewed features. No legacy NavigationView, one-argument onChange, blanket animation or raster workspace icon is introduced. SDK 27 item-driven alerts could simplify the failure binding; this is scoped maintenance, not a functional blocker. Soft-deprecations remain informational and require behavior/availability checks before migration. |
+| Accessibility | Selected task/answer traits, descriptive control labels, decorative-image hiding, semantic status and wrapping layouts are implemented. Captures show rendered layout, not VoiceOver order/announcements, Full Keyboard Access, Reduce Transparency or real device keyboard behavior. |
 
-## Validation and release blockers
+## Model and integration facts
 
-`Tools/SwiftUIPreview` compiles real feature/store code with a disabled model-service replacement. Its updated pipeline requires Xcode 27 / Swift 6.4 and typechecks shared iOS views and both production scene branches with SDK 27. It is not the production target or live agent runtime; earlier captures retain their SDK 26 provenance. State regression checks cover draft identity, isolation, preservation, send ownership, save completion and retry after corrupt-load repair. Existing EngineeringCore tests remain authoritative for domain validation and persistence rules.
+Direct Swift ChatGPT OAuth/PKCE, protected Keychain profiles, rotating refresh, the actual account model catalog and Responses streaming are implemented. The `LanguageModel` adapter uses the real Foundation Models framework and guided planning profile. Authentication is not a Mac/Node service; an API key is not substituted for a subscription.
 
-## Follow-up interaction review
+The Swift coordinator, eight observed developer threads, isolated scoped worktrees, durable handoffs, interrupted-delivery recovery, immutable draft PR publication and phone bridge are implemented. Native GitHub/Linear settings use device Keychain; public GitHub reads do not require a token. The remote host owns execution/model credentials. Live browser consent, account entitlement/inference, complete developer turns and an active Cloudflare route remain operational validation, not missing implementation disguised as design placeholders.
 
-The independent source review found concrete behavior gaps rather than a reason to redesign the accepted composition:
+## Evidence and remaining checks
 
-- Task activation now explicitly requests the compact detail column on every tap. Returning to the conversation and selecting the same task no longer depends on a changed selection ID.
-- The empty outcome overlay now accounts for visible legacy messages, so migrated conversation remains readable when no outcome exists.
-- Question options expose the selected accessibility trait and hide decorative radio symbols from VoiceOver.
-- A new-outcome sheet with nonempty input prevents accidental interactive dismissal. Explicit Cancel remains available without another confirmation step.
-- With on-device planning enabled, follow-ups automatically queue a new plan. A serial worker coalesces context, rejects stale results, respects unanswered questions and cancels queued work. Deterministic store checks cover those transitions independently of rendering; planned results still must not imply dispatch or connected developers.
+At final application source `e64b613`, [both full native builds and 119 portable tests passed](https://github.com/kmshdev/foundation-models-utilities/actions/runs/38193065476); [both scene branches, native regressions and seven captures also passed](https://github.com/kmshdev/foundation-models-utilities/actions/runs/38192295529). Production Mac startup passed separately. The current iPhone startup diagnostic timed out installing into an unresponsive hosted simulator before the app launched; earlier phone evidence remains tied to its original commit. See [NativeBuild](../NativeBuild/README.md).
 
-The original review's decisions on semantic typography, native materials, purposeful motion, plain-text editing and the absence of peer top-level tabs remain applicable. Source corrections require native interaction verification; successful compilation alone does not prove VoiceOver announcements or compact navigation behavior.
+The preview pipeline compiles real utilities, adapter, features, state and service/runtime code. Native checks exercise deterministic transports, framework planning, cryptography, isolated Keychain records, loopback framing and runtime lifecycle. There is no disabled planner replacement standing in for model integration. Screenshot fixtures do not authenticate or dispatch developers.
 
-Additional Apple references: [interactive dismissal](https://developer.apple.com/documentation/swiftui/view/interactivedismissdisabled(_:)) and [selected accessibility trait](https://developer.apple.com/documentation/swiftui/accessibilitytraits/isselected).
+Two additional capture cases are configured:
 
-Validated at `7b54a8d`: [both production builds and 14 core tests passed](https://github.com/kmshdev/foundation-models-utilities/actions/runs/38158254209); [SDK 27 preview compilation, store regression checks and five native captures passed](https://github.com/kmshdev/foundation-models-utilities/actions/runs/38158254245). The planning checks cover late-result rejection, latest-context coalescing, serialized calls, independent outcomes, cancellation unwind, provider failure recovery and question gating. The narrow capture confirms the connection label is no longer truncated. Direct VoiceOver and iPhone navigation interaction remain unverified.
+- `06-wide-workspace.png`: 1600 × 950 points, dark appearance.
+- `07-accessibility-workspace.png`: 1280 × 950 points, dark appearance, `DynamicTypeSize.accessibility2`.
 
-Before a production claim:
+Both cases were generated successfully. Inspection confirmed bounded conversation/composer width and stacked task/message metadata without sidebar or inspector overflow. Other previews cover normal dark, narrower Mac, empty workspace, increased contrast and light appearance. Mac accessibility-size capture does not establish iPhone Dynamic Type or compact keyboard behavior. The final captures also confirm the team action retains its visible label at both normal and narrower widths.
 
-1. Complete signing/distribution and native interaction coverage. Both full SDK 27 targets, including the actual model service and utilities package, now build.
-2. Complete the documented personal ChatGPT subscription transport, connected Swift developer execution and heartbeats, and verified handoffs/test/PR receipts. GitHub/Linear clients, scope enforcement, Keychain settings, issue intake and durable publication are implemented; task execution and end-to-end account/device behavior remain unfinished.
-3. Validate VoiceOver, keyboard traversal, sheets, live divider resizing, compact iPhone navigation and accessibility text sizes on native targets. Static screenshots cannot prove these behaviors.
-4. Exercise lifecycle behavior on devices. Draft relaunch persistence, ordered writes, atomic send/clear and failed-save retry are implemented and regression-tested. Normal Mac quit waits for flush; force termination before a debounced write can still lose the most recent keystrokes.
-5. Measure large histories with Instruments, establish UI integration coverage and verify release signing/distribution. No runtime performance improvement is quantified without profiling.
+Remaining interaction evidence covers first outcome creation, draft dismissal/relaunch, contextual setup, task selection/reselection, pause/restart, reading-position preservation, dividers, native keyboard traversal, VoiceOver, Reduce Motion/Transparency and compact-device behavior. Signed distribution, sandboxed host tools and account consent have operational requirements. No runtime performance result is quantified without profiling.
 
 ## Sources and skills
 
-Applied SwiftUI Expert review guidance for Observation, view structure, performance, layout, navigation, text, macOS windows/scenes/toolbars, animations, accessibility, Liquid Glass and API migration. The earlier native-design work also applied the SwiftUI Liquid Glass and UI Patterns skills.
+Applied SwiftUI Expert guidance for Observation/invalidation, composition, resizable layout, navigation/sheets, macOS scenes/views/window/toolbars, editing, accessibility, Liquid Glass, animation and API migration. Apple HIG/API pages were read through Firecrawl; primary documentation governs behavior rather than the apparent color of the concept.
 
-Apple documentation was consulted through Firecrawl; source pages are authoritative over inferred appearance from the concept:
-
-- [Applying Liquid Glass](https://developer.apple.com/documentation/swiftui/applying-liquid-glass-to-custom-views)
-- [Materials](https://developer.apple.com/design/human-interface-guidelines/materials)
 - [Layout](https://developer.apple.com/design/human-interface-guidelines/layout)
+- [Typography](https://developer.apple.com/design/human-interface-guidelines/typography)
+- [Sidebars](https://developer.apple.com/design/human-interface-guidelines/sidebars)
+- [Accessibility](https://developer.apple.com/design/human-interface-guidelines/accessibility)
+- [Materials](https://developer.apple.com/design/human-interface-guidelines/materials)
+- [Sheets](https://developer.apple.com/design/human-interface-guidelines/sheets)
+- [Motion](https://developer.apple.com/design/human-interface-guidelines/motion)
 - [NavigationSplitView](https://developer.apple.com/documentation/swiftui/navigationsplitview)
 - [HSplitView](https://developer.apple.com/documentation/swiftui/hsplitview)
-- [sidebarAdaptable](https://developer.apple.com/documentation/swiftui/tabviewstyle/sidebaradaptable)
-- [Settings scene](https://developer.apple.com/documentation/swiftui/settings)
-- [ScaledMetric](https://developer.apple.com/documentation/swiftui/scaledmetric)
-- [System SF Symbol images](https://developer.apple.com/documentation/swiftui/image/init(systemname:))
+- [Settings](https://developer.apple.com/documentation/swiftui/settings)
+- [Applying Liquid Glass](https://developer.apple.com/documentation/swiftui/applying-liquid-glass-to-custom-views)
+- [TextEditor](https://developer.apple.com/documentation/swiftui/texteditor)

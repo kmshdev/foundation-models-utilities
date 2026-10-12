@@ -1,6 +1,6 @@
 # Apple toolchain and native validation
 
-Verified 2026-10-11. The managed development workspace is Linux; it cannot run Xcode. Native build and launch checks run on GitHub's Apple silicon `xcode-27` image.
+Verified 2026-10-12. The managed development workspace is Linux; it cannot run Xcode. Native build and launch checks run on GitHub's Apple silicon `xcode-27` image.
 
 ## Resolved blocker
 
@@ -16,7 +16,7 @@ If this runner image is unavailable, use an Apple silicon Mac running macOS 26.6
 
 Apple's `xcode-select -s /Applications/Xcode.app` selects an installed bundle; it does not download a new Xcode. `xcodebuild -runFirstLaunch` initializes its components. `xcodebuild -downloadPlatform iOS -buildVersion 27.0` obtains a supported simulator runtime; adding a runtime to Xcode 26 does not replace its compiler and SDK with Xcode 27. Choose the correct Xcode bundle first.
 
-The repository workflow uses the supported hosted image rather than requiring an account-authenticated download on every build. An optional `workflow_dispatch` input, `capture_launch`, runs a bounded native launch-capture diagnostic after builds succeed. The first diagnostic captured the actual Mac app but stalled during iOS simulator installation/launch and was canceled. The Mac capture is in `Documentation/NativeBuild/macos-27.png`; iOS runtime behavior remains unverified. This diagnostic is separate from the required build checks and does not establish full UI interaction, VoiceOver, live model or integration readiness.
+The repository workflow uses the supported hosted image rather than requiring an account-authenticated download on every build. An optional `workflow_dispatch` input, `capture_launch`, runs a bounded native launch-capture diagnostic after builds succeed. The original diagnostic stalled during simulator installation. The corrected diagnostic discovers Device Hub/Simulator from the selected Xcode, releases Mac memory before starting the simulator, bounds commands and retains receipts. Both production apps launched successfully at `2b280cb`; current images and exact process evidence are in [NativeBuild](../NativeBuild/README.md). Startup evidence remains separate from full UI interaction, VoiceOver, live model entitlement and integration readiness.
 
 ## Sources
 

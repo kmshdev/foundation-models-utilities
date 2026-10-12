@@ -1,0 +1,12 @@
+{
+  "commit" : "e64b613f45918477ea2e3c4dd6a4ff8ccfeac53d",
+  "images" : [
+    "macos-27.png"
+  ],
+  "macProcessID" : 23150,
+  "macWindowID" : 33,
+  "usesProductionTargets" : true,
+  "verifiedPlatforms" : [
+    "macOS"
+  ]
+}
