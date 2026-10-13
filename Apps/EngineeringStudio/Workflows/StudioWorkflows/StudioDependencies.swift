@@ -82,6 +82,9 @@ public final class StudioDependencies {
     public func prepareForTermination() async -> Bool {
         guard await flush() else { return false }
         await runtime.disconnect()
+        async let github: Void = connections.githubMCP.shutdown()
+        async let linear: Void = connections.linearMCP.shutdown()
+        _ = await (github, linear)
         return true
     }
 }

@@ -1,14 +1,21 @@
 # Evidence and next work
 
-Recorded 2026-10-12. The native application, model integration and developer runtime are implemented; build, launch, account entitlement and deployment evidence remain distinct.
+Updated 2026-10-13. The native application, model integration and developer runtime are implemented; build, launch, account entitlement and deployment evidence remain distinct.
 
 ## Current repository
 
 The default app branch is `main`, tracking `origin/main`. The old local utilities-only branch is preserved as `archived-utilities-main`. CI watches `main`. The user's SDK 27 and harness updates are incorporated. No GitHub administration token is needed.
 
-## Layered app and provider-adapter draft — 2b17f1b
+## Reviewed migration merged — f94c972
 
-- [Draft PR #2](https://github.com/kmshdev/foundation-models-utilities/pull/2) is based on `main`; the default branch is unchanged and the migration is not merged.
+- [PR #2](https://github.com/kmshdev/foundation-models-utilities/pull/2) merged into `main` after explicit branch synchronization and an independent review/fix loop. The fetched branch had no remaining Git conflicts.
+- Reviewed head `8118274` fixes per-window deep-link routing, failed workspace restoration retry, MCP completion/deadline arbitration and stateless JSON/POST SSE transport.
+- [Validation](https://github.com/kmshdev/foundation-models-utilities/actions/runs/38347640878) passed both SDK 27 builds, 128 portable system tests, 21 portable MCP tests and 22 Apple MCP test definitions. [Native regressions and seven captures](https://github.com/kmshdev/foundation-models-utilities/actions/runs/38347801545) passed at the same reviewed head.
+- New work is on `codex/provider-oauth-mcp`: [native OAuth delivery](../Documentation/Engineering/Provider-authorization.md) follows read-only exploration, one dependency plan, exclusive service/workflow/UI ownership and integrated native checks. The earlier captures establish native rendering, not live provider consent.
+
+## Historical migration checkpoint — 2b17f1b
+
+- This checkpoint preceded the review fixes and merge above; its evidence remains tied to its original source.
 - The app owns compiler-enforced Core, Services, Workflows and Feature modules. Application source phases contain only scene/deep-link composition and the Mac delegate. Public feature APIs replace peer view construction. FoundationModelsUtilities lives under the app's Core folder while retaining its root Swift package product. See the [module map](../Documentation/Engineering/Module-architecture.md).
 - [Xcode 27 / Swift 6.4 validation](https://github.com/kmshdev/foundation-models-utilities/actions/runs/38252483471) passed at `2b17f1bfda6b7847c4f66c48a925eb56217124c2`: both complete production builds, 128 portable system tests, 17 portable MCP tests and the same 17 MCP tests on Apple's runtime. The live Codex handshake remains opt-in; that fixture does not establish an operational developer host.
 - [Native regressions and seven rendered previews](https://github.com/kmshdev/foundation-models-utilities/actions/runs/38252686838) passed at the same source: durable drafts/planning, service publication/recovery, the real Foundation Models adapter, CryptoKit/Security/Keychain, loopback authentication and runtime lifecycle. These captures contain labeled fixture data. The production app launch diagnostic was not run for this migration; historical launch receipts retain their original commits.

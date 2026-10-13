@@ -9,10 +9,17 @@ struct ServiceConnectionsView: View {
     let store: StudioStore
     @State private var githubToken = ""
     @State private var linearToken = ""
+    @State private var sheet: IntegrationSheet?
+    @State private var connectGitHubAfterDismiss = false
 
     var body: some View {
         Form {
-            Section("GitHub") {
+            MCPConnectionSection(connection: connections.githubMCP, configureGitHub: { connectAfterSave in
+                connectGitHubAfterDismiss = false
+                sheet = .githubApplication(connectAfterSave: connectAfterSave)
+            })
+            MCPConnectionSection(connection: connections.linearMCP)
+            Section("GitHub API") {
                 LabeledContent("Repository", value: "kmshdev/foundation-models-utilities")
                 LabeledContent("Access", value: connections.githubStatus)
                 if let date = connections.githubUpdatedAt { LabeledContent("Updated") { Text(date, style: .relative) } }
@@ -24,6 +31,7 @@ struct ServiceConnectionsView: View {
                 DisclosureGroup(connections.hasGitHubCredential ? "Replace saved token" : "Add account access") {
                     SecureField("GitHub personal access token", text: $githubToken)
                         .textContentType(.password)
+                        .modifier(ProviderCredentialFieldStyle())
                     Text("Public repository results load without a token. A repository-scoped token enables account access; credentials stay in this device’s Keychain.")
                         .font(.callout).foregroundStyle(.secondary)
                     Button("Save GitHub connection") {
@@ -57,7 +65,7 @@ struct ServiceConnectionsView: View {
                 }
                 if connections.githubTruncated { Text("Showing a limited set of recent results. Open GitHub for the full history.").font(.caption) }
             }
-            Section("Linear") {
+            Section("Linear API") {
                 LabeledContent("Project", value: "Engineering Workflow Automation")
                 LabeledContent("Access", value: connections.linearStatus)
                 if let date = connections.linearUpdatedAt { LabeledContent("Updated") { Text(date, style: .relative) } }
@@ -68,7 +76,9 @@ struct ServiceConnectionsView: View {
                     if connections.refreshingLinear { ProgressView().controlSize(.small) }
                 }
                 DisclosureGroup(connections.hasLinearCredential ? "Replace saved API key" : "Connect Linear") {
-                    SecureField("Linear personal API key", text: $linearToken).textContentType(.password)
+                    SecureField("Linear personal API key", text: $linearToken)
+                        .textContentType(.password)
+                        .modifier(ProviderCredentialFieldStyle())
                     Text("Use a personal key with access to the Engineering project. The app verifies the project before saving it in Keychain.")
                         .font(.callout).foregroundStyle(.secondary)
                     Link("Manage Linear API keys", destination: URL(string: "https://linear.app/settings/account/security")!)
@@ -97,5 +107,18 @@ struct ServiceConnectionsView: View {
         }
         .formStyle(.grouped)
         .navigationTitle("Connections")
+        .sheet(item: $sheet, onDismiss: {
+            guard connectGitHubAfterDismiss else { return }
+            connectGitHubAfterDismiss = false
+            Task { await connections.githubMCP.connect() }
+        }) { item in
+            switch item {
+            case .githubApplication(let connectAfterSave):
+                GitHubAppConfigurationSheet(connection: connections.githubMCP, connectAfterSave: connectAfterSave,
+                                           registrationSaved: {
+                    connectGitHubAfterDismiss = connectAfterSave
+                })
+            }
+        }
     }
 }
