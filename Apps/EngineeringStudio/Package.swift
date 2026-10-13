@@ -49,7 +49,7 @@ targets += [
 #if os(macOS)
 products.append(.executable(name: "EngineeringPreviewHost", targets: ["EngineeringPreviewHost"]))
 targets.append(.executableTarget(name: "EngineeringPreviewHost",
-    dependencies: ["EngineeringCore", "EngineeringServices", "EngineeringWorkflows", "StudioUI", "StudioServices", "StudioWorkflows", "WorkspaceFeature", utilities],
+    dependencies: ["EngineeringCore", "EngineeringServices", "EngineeringWorkflows", "EngineeringMCP", "StudioUI", "StudioServices", "StudioWorkflows", "IntegrationFeature", "WorkspaceFeature", utilities],
     path: "Tests/NativePreviewHost"))
 #endif
 

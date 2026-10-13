@@ -1,6 +1,7 @@
 @testable import WorkspaceFeature
 @testable import StudioWorkflows
 @testable import StudioServices
+@testable import IntegrationFeature
 import StudioUI
 import EngineeringWorkflows
 import EngineeringServices
@@ -29,6 +30,7 @@ private final class CaptureDelegate: NSObject, NSApplicationDelegate {
                 try checkWorkspaceNavigation()
                 try await checkStudioStartup()
                 try await checkServiceConnections()
+                try await checkProviderAuthorization()
                 try await checkSubscriptionModel()
                 try await checkChatGPTAuthentication()
                 try await checkChatGPTConnection()
@@ -79,6 +81,15 @@ private final class CaptureDelegate: NSObject, NSApplicationDelegate {
                 try await capture(StudioRootView(store: store, initialOutcomeID: outcomeID, initialTaskID: "core-01"),
                                   name: "07-accessibility-workspace", width: 1280, height: 950, output: output,
                                   dynamicType: .accessibility2)
+                let previewConnections = ServiceConnections(githubMCP: fixtureProviderConnection(provider: .github),
+                                                            linearMCP: fixtureProviderConnection(provider: .linear))
+                await previewConnections.githubMCP.restore()
+                await previewConnections.linearMCP.restore()
+                try await capture(StudioSheetView(kind: .connections, store: store, connections: previewConnections,
+                                                 chatGPT: ChatGPTConnection(), runtime: DeveloperRuntimeConnection()),
+                                  name: "08-provider-connections", width: 760, height: 1040, output: output)
+                try await capture(IntegrationFeatureAPI.registration(connections: previewConnections),
+                                  name: "09-github-registration", width: 560, height: 720, output: output)
                 print("Captured real native SwiftUI views with preview data. Services disabled.")
                 NSApp.terminate(nil)
             } catch {

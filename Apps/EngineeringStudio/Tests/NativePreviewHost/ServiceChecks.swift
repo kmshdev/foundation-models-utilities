@@ -17,7 +17,9 @@ func checkServiceConnections() async throws {
     let journal = ServiceCheckJournal()
     let vault = MemoryConnectionCredentials(journal: journal)
     let transport = ServiceCheckTransport(journal: journal)
-    let connections = ServiceConnections(credentialStore: vault, transport: transport)
+    let connections = ServiceConnections(credentialStore: vault, transport: transport,
+                                         githubMCP: fixtureProviderConnection(provider: .github),
+                                         linearMCP: fixtureProviderConnection(provider: .linear))
     try serviceRequire(journal.events.isEmpty, "Model initialization performs no I/O")
 
     transport.rejectProject = true
@@ -44,7 +46,9 @@ func checkServiceConnections() async throws {
     let failingVault = MemoryConnectionCredentials(journal: ServiceCheckJournal())
     failingVault.failWrites = true
     let failingConnection = ServiceConnections(credentialStore: failingVault,
-                                               transport: ServiceCheckTransport(journal: ServiceCheckJournal()))
+                                               transport: ServiceCheckTransport(journal: ServiceCheckJournal()),
+                                               githubMCP: fixtureProviderConnection(provider: .github),
+                                               linearMCP: fixtureProviderConnection(provider: .linear))
     try serviceRequire(!(await failingConnection.connectLinear(token: "fixture-linear")) &&
                        !failingConnection.hasLinearCredential && failingVault.values.isEmpty,
                        "Keychain write failure does not claim a connected credential")
@@ -52,7 +56,9 @@ func checkServiceConnections() async throws {
     let unreadableVault = MemoryConnectionCredentials(journal: ServiceCheckJournal())
     unreadableVault.failReads = true
     let unreadableConnection = ServiceConnections(credentialStore: unreadableVault,
-                                                  transport: ServiceCheckTransport(journal: ServiceCheckJournal()))
+                                                  transport: ServiceCheckTransport(journal: ServiceCheckJournal()),
+                                                  githubMCP: fixtureProviderConnection(provider: .github),
+                                                  linearMCP: fixtureProviderConnection(provider: .linear))
     await unreadableConnection.load()
     try serviceRequire(unreadableConnection.repository != nil && unreadableConnection.githubError != nil &&
                        unreadableConnection.githubStatus.contains("Credential unavailable") &&
@@ -108,12 +114,19 @@ func checkServiceConnections() async throws {
 
     try await checkPublicationStopsOnPlanChange(in: directory)
 
+    await connections.linearMCP.disconnect()
+    try serviceRequire(vault.values["linear"] == "fixture-linear" && connections.hasLinearCredential &&
+                       connections.project?.id == ServiceScope.linearProjectID,
+                       "Disconnecting MCP preserves the separate Linear publication credential and project")
     connections.disconnectLinear()
     try serviceRequire(vault.values["linear"] == nil && !connections.hasLinearCredential &&
                        connections.project == nil && connections.issues.isEmpty && connections.linearUpdatedAt == nil &&
                        connections.publicationStatus == nil && connections.publicationError == nil,
                        "Disconnect clears Linear credentials, data and publication feedback")
     try serviceRequire(await connections.connectGitHub(token: "fixture-github"), "GitHub credential connects after repository verification")
+    await connections.githubMCP.disconnect()
+    try serviceRequire(vault.values["github"] == "fixture-github" && connections.hasGitHubCredential,
+                       "Disconnecting MCP preserves the separate GitHub publication credential")
     transport.failReads = true
     await connections.disconnectGitHub()
     try serviceRequire(vault.values["github"] == nil && !connections.hasGitHubCredential &&
@@ -253,7 +266,9 @@ private func checkPublicationStopsOnPlanChange(in directory: URL) async throws {
     for (loseResponse, olderRemoteContent) in [(false, false), (true, false), (true, true)] {
         let journal = ServiceCheckJournal()
         let transport = ServiceCheckTransport(journal: journal)
-        let connections = ServiceConnections(credentialStore: MemoryConnectionCredentials(journal: journal), transport: transport)
+        let connections = ServiceConnections(credentialStore: MemoryConnectionCredentials(journal: journal), transport: transport,
+                                             githubMCP: fixtureProviderConnection(provider: .github),
+                                             linearMCP: fixtureProviderConnection(provider: .linear))
         try serviceRequire(await connections.connectLinear(token: "fixture-linear"), "Race fixture connects")
         let first = WorkTask(id: "first", title: "Original first assignment", owner: .interface,
                              paths: ["Apps/First.swift"], acceptance: ["First behavior verified"],

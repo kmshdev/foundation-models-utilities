@@ -22,7 +22,9 @@ func checkStudioStartup() async throws {
                                 authorizationCryptography: StartupCryptography())
     let account = ChatGPTConnection(session: session,
                                    client: ChatGPTResponsesClient(tokenProvider: session, catalogTransport: transport))
-    let connections = ServiceConnections(credentialStore: credentials, transport: transport)
+    let connections = ServiceConnections(credentialStore: credentials, transport: transport,
+                                         githubMCP: fixtureProviderConnection(provider: .github),
+                                         linearMCP: fixtureProviderConnection(provider: .linear))
     let runtime = DeveloperRuntimeConnection(credentials: credentials, remoteTransport: transport,
         receiptJournal: ExecutionReceiptJournal(url: directory.appendingPathComponent("receipts.json")))
     let dependencies = StudioDependencies(store: store, connections: connections, chatGPT: account, runtime: runtime)

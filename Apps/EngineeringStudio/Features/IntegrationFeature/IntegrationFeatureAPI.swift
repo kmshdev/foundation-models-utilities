@@ -13,6 +13,11 @@ public enum IntegrationFeatureAPI {
         ServiceConnectionsView(connections: connections, store: store)
     }
 
+    /// Captures the same native registration form without presenting a live sign-in session.
+    package static func registration(connections: ServiceConnections) -> some View {
+        GitHubAppConfigurationSheet(connection: connections.githubMCP)
+    }
+
     package static func accounts(store: StudioStore, chatGPT: ChatGPTConnection) -> some View {
         ChatGPTConnectionView(connection: chatGPT, store: store)
     }

@@ -7,6 +7,9 @@ import Observation
 
 @MainActor @Observable
 package final class ServiceConnections {
+    /// MCP grants remain isolated from the API credentials used for ticket and PR writes.
+    package let githubMCP: ProviderMCPConnection
+    package let linearMCP: ProviderMCPConnection
     package private(set) var repository: GitHubRepository?
     package private(set) var pullRequests: [GitHubPullRequest] = []
     package private(set) var workflowRuns: [GitHubWorkflowRun] = []
@@ -38,9 +41,12 @@ package final class ServiceConnections {
 
     /// Constructing the model never reads Keychain, disk or the network.
     package init(credentialStore: any ConnectionCredentialStore = SystemConnectionKeychain(),
-         transport: any ServiceHTTPTransport = URLSessionServiceTransport()) {
+         transport: any ServiceHTTPTransport = URLSessionServiceTransport(),
+         githubMCP: ProviderMCPConnection? = nil, linearMCP: ProviderMCPConnection? = nil) {
         self.credentialStore = credentialStore
         self.transport = transport
+        self.githubMCP = githubMCP ?? ProviderMCPConnection(provider: .github)
+        self.linearMCP = linearMCP ?? ProviderMCPConnection(provider: .linear)
     }
 
     /// Called by the actual app scene. Preview initialization does no I/O.
@@ -60,7 +66,9 @@ package final class ServiceConnections {
         } catch { linearError = error.localizedDescription }
         async let github: Void = refreshGitHub()
         async let linear: Void = refreshLinear()
-        _ = await (github, linear)
+        async let githubAuthorization: Void = githubMCP.restore()
+        async let linearAuthorization: Void = linearMCP.restore()
+        _ = await (github, linear, githubAuthorization, linearAuthorization)
     }
 
     @discardableResult package func connectGitHub(token: String) async -> Bool {

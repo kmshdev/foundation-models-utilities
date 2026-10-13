@@ -1,6 +1,6 @@
 # Native provider adapters and MCP
 
-Architecture proposal and research checkpoint, 2026-10-12. This document separates the app's existing connections, the shared MCP client introduced in this draft, and proposed account-login and model-tool flows. Provider registrations, browser consent, live MCP authorization and model-driven MCP calls have not been activated.
+Architecture research checkpoint, 2026-10-12. The reviewed module/MCP migration was merged in PR #2 on 2026-10-13. The current native OAuth implementation and corrected callback/registration decisions are tracked in [Provider authorization](Provider-authorization.md). This document retains the broader adapter and future model-tool research; account consent and model-driven MCP calls are not established by research or builds.
 
 ## Decision
 
