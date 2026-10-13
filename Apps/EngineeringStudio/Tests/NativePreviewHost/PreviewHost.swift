@@ -26,6 +26,8 @@ private final class CaptureDelegate: NSObject, NSApplicationDelegate {
         Task {
             do {
                 try await checkStudioStore()
+                try checkWorkspaceNavigation()
+                try await checkStudioStartup()
                 try await checkServiceConnections()
                 try await checkSubscriptionModel()
                 try await checkChatGPTAuthentication()

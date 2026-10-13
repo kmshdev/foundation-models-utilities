@@ -21,7 +21,7 @@ struct StudioRootView: View {
     @State private var compactColumn: NavigationSplitViewColumn = .sidebar
     @State private var sheet: StudioSheet?
     @State private var search = ""
-    @State private var appliedNavigationID: UUID?
+    @State private var routing: WorkspaceRouting
     @State private var routedTaskID: String?
     @State private var routedOutcomeID: UUID?
     #if os(macOS)
@@ -41,6 +41,7 @@ struct StudioRootView: View {
         self.initialDraft = initialDraft
         _destination = State(initialValue: initialOutcomeID.map(WorkspaceDestination.outcome) ?? .all)
         _selectedTaskID = State(initialValue: initialTaskID)
+        self.routing = WorkspaceRouting(preservesInitialSelection: initialOutcomeID != nil)
     }
 
     private var outcome: Outcome? {
@@ -62,6 +63,11 @@ struct StudioRootView: View {
     private var visibleLegacyMessages: [RoomMessage] {
         guard destination == .all, search.isEmpty else { return [] }
         return store.workspace.messages.filter { $0.outcomeID == nil }
+    }
+
+    private var routingInput: WorkspaceRoutingInput {
+        .init(isLoaded: store.isLoaded, latestOutcomeID: store.workspace.outcomes.last?.id,
+              requestID: navigation?.requestID)
     }
 
     var body: some View {
@@ -144,14 +150,9 @@ struct StudioRootView: View {
             else { selectedTaskID = nil }
             routedOutcomeID = nil; routedTaskID = nil
         }
-        .onChange(of: navigation?.requestID) { _, _ in applyNavigationRequest() }
-        .onChange(of: store.isLoaded) { _, loaded in if loaded { applyNavigationRequest() } }
-        .onAppear { applyNavigationRequest() }
+        .onChange(of: routingInput, initial: true) { _, input in applyRouting(input) }
         .onChange(of: search) { _, query in
             if !query.isEmpty { destination = .all; compactColumn = .content }
-        }
-        .onChange(of: store.workspace.outcomes.last?.id) { _, id in
-            if let id { destination = .outcome(id); compactColumn = .content }
         }
         .onChange(of: outcome?.plan) { _, plan in
             if !((plan?.tasks.contains { $0.id == selectedTaskID }) ?? false) { selectedTaskID = nil }
@@ -162,21 +163,21 @@ struct StudioRootView: View {
         message: { Text(store.failure ?? "") }
     }
 
-    private func applyNavigationRequest() {
-        guard store.isLoaded, let navigation, let requestID = navigation.requestID,
-              requestID != appliedNavigationID, let route = navigation.request else { return }
-        appliedNavigationID = requestID
-        guard let target = store.workspace.outcomes.first(where: { $0.id == route.outcomeID }) else {
+    private func applyRouting(_ input: WorkspaceRoutingInput) {
+        switch routing.resolve(input, request: navigation?.request, outcomes: store.workspace.outcomes) {
+        case .none:
+            return
+        case .missingOutcome:
             store.failure = "This outcome is not saved in this workspace."
             return
+        case .select(let outcomeID, let taskID):
+            if destination == .outcome(outcomeID) { selectedTaskID = taskID }
+            else {
+                routedOutcomeID = outcomeID; routedTaskID = taskID
+                destination = .outcome(outcomeID)
+            }
+            compactColumn = taskID == nil ? .content : .detail
         }
-        let taskID = target.plan?.tasks.first { $0.id == route.taskID }?.id
-        if destination == .outcome(target.id) { selectedTaskID = taskID }
-        else {
-            routedOutcomeID = target.id; routedTaskID = taskID
-            destination = .outcome(target.id)
-        }
-        compactColumn = taskID == nil ? .content : .detail
     }
 
     #if os(iOS)
