@@ -11,12 +11,8 @@ public enum EngineeringMCPHTTPFactory {
     /// MCP OAuthAuthorizer must not be shared across transports (its upstream isolation contract).
     public static func oauth(policy: MCPToolPolicy, appVersion: String,
                              authorizer: OAuthAuthorizer, limits: MCPClientLimits = .init()) throws -> EngineeringMCPClient {
-        let transport = HTTPClientTransport(endpoint: policy.identity.endpoint,
-                                            configuration: networkConfiguration(),
-                                            streaming: true, authorizer: authorizer,
-                                            requestModifier: { request in
-            readOnlyRequest(request, identity: policy.identity)
-        })
+        let transport = makeTransport(identity: policy.identity, configuration: networkConfiguration(),
+                                      authorizer: authorizer)
         return try EngineeringMCPClient(policy: policy, transport: transport,
                                         appVersion: appVersion, limits: limits)
     }
@@ -26,17 +22,27 @@ public enum EngineeringMCPHTTPFactory {
     public static func token(policy: MCPToolPolicy, appVersion: String,
                              accessToken: @escaping @Sendable () -> String?,
                              limits: MCPClientLimits = .init()) throws -> EngineeringMCPClient {
-        let endpoint = policy.identity.endpoint
-        let transport = HTTPClientTransport(endpoint: endpoint, configuration: networkConfiguration(),
-                                            streaming: true, requestModifier: { request in
-            var request = readOnlyRequest(request, identity: policy.identity)
-            if request.url == endpoint, let token = accessToken(), !token.isEmpty {
+        let transport = makeTransport(identity: policy.identity, configuration: networkConfiguration(),
+                                      accessToken: accessToken)
+        return try EngineeringMCPClient(policy: policy, transport: transport,
+                                        appVersion: appVersion, limits: limits)
+    }
+
+    static func makeTransport(identity: MCPConnectionIdentity, configuration: URLSessionConfiguration,
+                              authorizer: OAuthAuthorizer? = nil,
+                              accessToken: (@Sendable () -> String?)? = nil) -> HTTPClientTransport {
+        // SDK 0.12.1's optional GET listener waits for a session-ID signal even
+        // after its timeout when a stateless server omits MCP-Session-Id.
+        // `streaming: false` skips only that listener: send() still decodes JSON
+        // and SSE POST responses. Reads refresh their catalog before invocation.
+        HTTPClientTransport(endpoint: identity.endpoint, configuration: configuration,
+                            streaming: false, authorizer: authorizer, requestModifier: { request in
+            var request = readOnlyRequest(request, identity: identity)
+            if request.url == identity.endpoint, let token = accessToken?(), !token.isEmpty {
                 request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             }
             return request
         })
-        return try EngineeringMCPClient(policy: policy, transport: transport,
-                                        appVersion: appVersion, limits: limits)
     }
 
     /// Provider-supported read-only catalog mode supplements the local reviewed policy.

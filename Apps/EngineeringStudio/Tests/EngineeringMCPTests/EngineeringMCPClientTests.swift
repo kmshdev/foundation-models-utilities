@@ -168,6 +168,23 @@ struct EngineeringMCPClientTests {
         await fixture.stop()
     }
 
+    @Test("A changed catalog without a notification is rediscovered before a reviewed read")
+    func unannouncedCatalogChange() async throws {
+        let fixture = MCPServerFixture(pages: [nil: .init(tools: [MCPServerFixture.tool("read_issue")])])
+        let adapter = try await adapter(fixture)
+        try await adapter.initialize()
+        _ = try await adapter.callRead(named: "read_issue", arguments: ["repository": "kmshdev/foundation-models-utilities"])
+        let changed: Value = ["type": "object", "properties": ["differentScope": ["type": "string"]]]
+        await fixture.setCatalogWithoutNotification(to: [nil: .init(tools: [MCPServerFixture.tool("read_issue", schema: changed)])])
+        await #expect(throws: MCPClientError.schemaChanged("read_issue")) {
+            try await adapter.callRead(named: "read_issue", arguments: ["repository": "kmshdev/foundation-models-utilities"])
+        }
+        #expect(await fixture.listCount == 2)
+        #expect(await fixture.callCount == 1)
+        await adapter.disconnect()
+        await fixture.stop()
+    }
+
     @Test("RPC deadline releases an indefinitely delayed response and closes its dedicated connection")
     func requestTimeout() async throws {
         let fixture = MCPServerFixture(pages: [nil: .init(tools: [MCPServerFixture.tool("read_issue")])], delayCalls: true)
@@ -222,6 +239,21 @@ struct EngineeringMCPClientTests {
         await #expect(throws: MCPClientError.deadlineExceeded) { try await adapter.initialize() }
         #expect(started.duration(to: .now) < .seconds(2))
         #expect(await adapter.isClosed)
+        await fixture.stop()
+    }
+
+    @Test("Disconnect during initialization never publishes a late connection receipt")
+    func disconnectDuringInitialization() async throws {
+        let fixture = MCPServerFixture(pages: [:])
+        let adapter = try await adapter(fixture)
+        await fixture.overrideInitialization(neverRespond: true)
+        let initialize = Task { try await adapter.initialize() }
+        await fixture.waitForInitialization()
+        await adapter.disconnect()
+        await #expect(throws: (any Error).self) { try await initialize.value }
+        #expect(await adapter.isClosed)
+        #expect(await adapter.initialization == nil)
+        await #expect(throws: MCPClientError.connectionClosed) { try await adapter.initialize() }
         await fixture.stop()
     }
 

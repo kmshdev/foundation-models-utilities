@@ -92,6 +92,10 @@ public actor EngineeringMCPClient {
         try beginOperation()
         defer { operationInProgress = false }
 
+        // HTTP read mode does not depend on a standalone server event stream.
+        // Rediscover before invoking so an unannounced catalog change cannot
+        // bypass the reviewed-schema check. Notifications still invalidate early.
+        invalidateCatalog()
         let catalog = try await loadCatalog()
         guard let tool = catalog.tools.first(where: { $0.name == name }) else {
             throw MCPClientError.toolUnavailable(name)

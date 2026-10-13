@@ -14,6 +14,8 @@ actor MCPServerFixture {
     private(set) var callCount = 0
     private var callWaiters: [CheckedContinuation<Void, Never>] = []
     private var delayedCalls: [CheckedContinuation<Void, any Error>] = []
+    private var initializationStarted = false
+    private var initializationWaiters: [CheckedContinuation<Void, Never>] = []
 
     init(pages: [String?: ListTools.Result], result: CallTool.Result = .init(content: [.text(text: "Found", annotations: nil, _meta: nil)]),
          supportsTools: Bool = true, delayCalls: Bool = false, callError: MCPError? = nil,
@@ -55,8 +57,9 @@ actor MCPServerFixture {
 
     func overrideInitialization(protocolVersion: String? = nil, neverRespond: Bool = false) async {
         await server.withMethodHandler(Initialize.self) { [weak self] _ in
+            guard let self else { throw MCPError.connectionClosed }
+            await self.markInitializationStarted()
             if neverRespond {
-                guard let self else { throw MCPError.connectionClosed }
                 try await self.delayResponse()
             }
             return .init(protocolVersion: protocolVersion ?? Version.latest,
@@ -65,9 +68,25 @@ actor MCPServerFixture {
         }
     }
 
+    func waitForInitialization() async {
+        guard !initializationStarted else { return }
+        await withCheckedContinuation { initializationWaiters.append($0) }
+    }
+
+    private func markInitializationStarted() {
+        initializationStarted = true
+        let pending = initializationWaiters
+        initializationWaiters.removeAll()
+        pending.forEach { $0.resume() }
+    }
+
     func changeCatalog(to pages: [String?: ListTools.Result]) async throws {
         self.pages = pages
         try await server.notify(ToolListChangedNotification.message())
+    }
+
+    func setCatalogWithoutNotification(to pages: [String?: ListTools.Result]) {
+        self.pages = pages
     }
 
     func waitForCall() async {

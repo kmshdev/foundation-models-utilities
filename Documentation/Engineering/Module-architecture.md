@@ -6,7 +6,7 @@ The app follows App → Features → Workflows → Services → Core. The SwiftP
 
 | Layer | Modules and responsibilities |
 | --- | --- |
-| App | `App/EngineeringStudioApp.swift` creates dependencies and feature navigation, defines scenes, delivers parsed deep-links and forwards lifecycle events. `StudioAppDelegate` coordinates normal Mac termination. Assets, entitlements and URL-scheme registration live here. |
+| App | `App/EngineeringStudioApp.swift` creates shared dependencies, defines scenes and forwards lifecycle events. Each `StudioWindow` owns its feature navigation and delivers parsed deep-links. `StudioAppDelegate` coordinates normal Mac termination. Assets, entitlements and URL-scheme registration live here. |
 | Features | `WorkspaceFeature`, `IntegrationFeature`, `RuntimeFeature` and `SettingsFeature` implement native screens and expose named public `*FeatureAPI` entry points. `WorkspaceNavigation` exposes routing without exporting view implementation. Peer features call the exposed API. |
 | Workflows | `StudioWorkflows` owns workspace/draft state, planning orchestration, account-bound runtime coordination, Linear publication/reconciliation and composed startup/shutdown. `EngineeringWorkflows` schedules developers and dependency handoffs over lower-level execution services. |
 | Services | `EngineeringServices` implements typed GitHub/Linear APIs, subscription authentication/transport and developer execution infrastructure. `StudioServices` implements Apple authentication, Keychain, Foundation Models integration and native loopback infrastructure. `EngineeringMCP` wraps the official Swift MCP client with reviewed read-only operations. |

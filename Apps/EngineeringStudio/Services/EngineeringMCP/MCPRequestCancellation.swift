@@ -6,8 +6,9 @@ import MCP
 actor MCPRequestCancellation {
     let client: Client
     let requestID: ID?
-    private var cancelled = false
-    private(set) var didExceedDeadline = false
+    private(set) var resolution: MCPRequestResolution = .pending
+
+    var didExceedDeadline: Bool { resolution == .timedOut }
 
     init(client: Client, requestID: ID? = nil) {
         self.client = client
@@ -15,8 +16,20 @@ actor MCPRequestCancellation {
     }
 
     func cancel() async {
-        guard !cancelled else { return }
-        cancelled = true
+        // Explicit caller cancellation may supersede a completed response that has
+        // not yet been returned to that caller. A losing timer may not do the same.
+        guard resolution != .cancelled, resolution != .timedOut else { return }
+        resolution = .cancelled
+        await closeConnection()
+    }
+
+    func complete() -> Bool {
+        guard resolution == .pending else { return false }
+        resolution = .completed
+        return true
+    }
+
+    private func closeConnection() async {
         await withTaskGroup(of: Void.self) { group in
             if let requestID {
                 group.addTask { [client] in
@@ -27,8 +40,11 @@ actor MCPRequestCancellation {
         }
     }
 
-    func timeOut() async {
-        didExceedDeadline = true
-        await cancel()
+    @discardableResult
+    func timeOut() async -> Bool {
+        guard resolution == .pending else { return false }
+        resolution = .timedOut
+        await closeConnection()
+        return true
     }
 }
