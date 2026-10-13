@@ -16,14 +16,19 @@ This directory adapts the upstream Agency Agents strategy structure—focused pl
 
 | Area | Purpose |
 | --- | --- |
-| `Sources` | FoundationModelsUtilities library, consumed locally by both app targets |
-| `Packages/EngineeringCore` | Portable coordination, task ownership and workspace persistence |
-| `Apps/EngineeringStudio` | Native SwiftUI features, app state and Apple/service adapters |
-| `Tools` | Swift developer utilities and capture checks |
+| `Apps/EngineeringStudio/Core` | Leaf contracts, persistence/networking primitives, native UI primitives and FoundationModelsUtilities |
+| `Apps/EngineeringStudio/Services` | Domain adapters, model/authentication transports, runtime infrastructure and MCP client |
+| `Apps/EngineeringStudio/Workflows` | Cross-service planning, publication, developer dispatch and lifecycle orchestration |
+| `Apps/EngineeringStudio/Features` | Public feature entry points and native SwiftUI implementations |
+| `Apps/EngineeringStudio/App` | Scenes, deep-links, assets and dependency composition |
+| `Apps/EngineeringStudio/Tests` | Portable/MCP tests and the native regression/capture host |
+| `Tools` | Swift build, launch and capture utilities |
 | `.github/workflows` | Build and verification metadata |
 | `.codex/agents` | Codex development profiles, loaded by compatible Codex sessions |
 
 The repository allowlist is `kmshdev/foundation-models-utilities`; upstream Apple utilities are a research/reference source. The selected Linear project is **Engineering Workflow Automation**. Resolve actual project and issue identifiers before writes; a saved name does not establish access. Honor explicit order, urgent defects, dependency blockers, then Linear priority.
+
+Follow the [module map](../Documentation/Engineering/Module-architecture.md): migrate Core → Services → Workflows → Features → App, and use exposed feature APIs for peer feature calls. The app package manifest enforces dependency direction.
 
 ## Tooling and persistence
 

@@ -6,6 +6,15 @@ Recorded 2026-10-12. The native application, model integration and developer run
 
 The default app branch is `main`, tracking `origin/main`. The old local utilities-only branch is preserved as `archived-utilities-main`. CI watches `main`. The user's SDK 27 and harness updates are incorporated. No GitHub administration token is needed.
 
+## Layered app and provider-adapter draft — 2b17f1b
+
+- [Draft PR #2](https://github.com/kmshdev/foundation-models-utilities/pull/2) is based on `main`; the default branch is unchanged and the migration is not merged.
+- The app owns compiler-enforced Core, Services, Workflows and Feature modules. Application source phases contain only scene/deep-link composition and the Mac delegate. Public feature APIs replace peer view construction. FoundationModelsUtilities lives under the app's Core folder while retaining its root Swift package product. See the [module map](../Documentation/Engineering/Module-architecture.md).
+- [Xcode 27 / Swift 6.4 validation](https://github.com/kmshdev/foundation-models-utilities/actions/runs/38252483471) passed at `2b17f1bfda6b7847c4f66c48a925eb56217124c2`: both complete production builds, 128 portable system tests, 17 portable MCP tests and the same 17 MCP tests on Apple's runtime. The live Codex handshake remains opt-in; that fixture does not establish an operational developer host.
+- [Native regressions and seven rendered previews](https://github.com/kmshdev/foundation-models-utilities/actions/runs/38252686838) passed at the same source: durable drafts/planning, service publication/recovery, the real Foundation Models adapter, CryptoKit/Security/Keychain, loopback authentication and runtime lifecycle. These captures contain labeled fixture data. The production app launch diagnostic was not run for this migration; historical launch receipts retain their original commits.
+- The `EngineeringMCP` service pins official Swift SDK 0.12.1, preserves structured output and enforces reviewed schemas/arguments, read-only operations, bounded catalogs/results and deadlines/cancellation. Its HTTP factory uses GitHub's documented read-only header and Linear's read-only endpoint. It is not activated by current app connection controls.
+- [Provider research](../Documentation/Engineering/Provider-adapters.md) recommends Apple system-browser OAuth, with passkeys offered by the provider during sign-in. GitHub requires host-owned registration; Linear MCP supports dynamic registration. The browser/callback adapters, token lifecycle integration, scoped live reads and workflow-controlled MCP planner context are proposed next steps. No provider registration, account consent or live mutation was performed during research.
+
 ## Implemented and verified
 
 - Direct Swift ChatGPT OAuth/PKCE registration, issued client IDs, validated RS256 identity, protected native Keychain profiles and serialized rotating refresh. No Node/Mac authentication service and no billed API-key substitute. Portable authentication checks and native CryptoKit/Security/loopback checks passed.

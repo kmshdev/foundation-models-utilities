@@ -20,12 +20,12 @@ concurrency:
 
 jobs:
   core:
-    name: Swift 6.4 core tests
+    name: Swift 6.4 portable and MCP tests
     runs-on: ubuntu-latest
     container: swift:6.4@sha256:4601bf61dab9485a3e93087770b72d268737e945a5b000e2286b6cc48bb048b6
     steps:
       - uses: actions/checkout@v4
-      - run: swift test --package-path Packages/EngineeringCore
+      - run: swift test --package-path Apps/EngineeringStudio --jobs 2
 
   native:
     name: Native iOS and macOS builds
@@ -65,6 +65,9 @@ jobs:
       - name: Build macOS
         if: (success() || failure()) && steps.toolchain.outcome == 'success'
         run: xcodebuild -project EngineeringStudio.xcodeproj -scheme EngineeringStudioMac -destination 'generic/platform=macOS' -derivedDataPath DerivedData -resultBundlePath Results/macOS.xcresult CODE_SIGNING_ALLOWED=NO build
+      - name: Native MCP adapter regression checks
+        if: success()
+        run: swift test --package-path Apps/EngineeringStudio --jobs 2 --filter EngineeringMCPTests
       - name: Launch actual apps on macOS 27 and iOS 27
         if: success() && inputs.capture_launch == true
         timeout-minutes: 15

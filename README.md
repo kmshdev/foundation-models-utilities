@@ -2,7 +2,7 @@
 
 Native SwiftUI engineering workspace for **iOS 27 and macOS 27**, implemented in **Swift 6.4**. The default `main` branch contains the app alongside the FoundationModelsUtilities library.
 
-Open [`EngineeringStudio.xcodeproj`](EngineeringStudio.xcodeproj) and select `EngineeringStudioiOS` or `EngineeringStudioMac`. App source is in [`Apps/EngineeringStudio`](Apps/EngineeringStudio); the portable coordination package and its tests are in [`Packages/EngineeringCore`](Packages/EngineeringCore). Both app targets use the root utilities package locally.
+Open [`EngineeringStudio.xcodeproj`](EngineeringStudio.xcodeproj) and select `EngineeringStudioiOS` or `EngineeringStudioMac`. [`Apps/EngineeringStudio`](Apps/EngineeringStudio) owns the App, Features, Workflows, Services and Core layers as Swift modules. FoundationModelsUtilities lives in its Core layer; the root package retains the existing library product. See the [module map](Documentation/Engineering/Module-architecture.md) and [native provider-adapter proposal](Documentation/Engineering/Provider-adapters.md).
 
 **Current status:** both native targets build on Xcode 27 / Swift 6.4. The app implements direct personal ChatGPT sign-in, Foundation Models planning, durable conversations/drafts, eight developer runtime slots, scoped GitHub/Linear integrations, handoffs, command receipts and draft PR publication. Production app launches are verified; live personal-account consent/inference and an active execution host still need operational setup. This is not a signed distribution release. See the [current evidence](strategy/current-state.md).
 

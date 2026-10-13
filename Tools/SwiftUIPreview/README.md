@@ -1,10 +1,10 @@
 # Native screenshot previews
 
-This Swift-only host compiles the app's actual view and store source using Xcode 27 / Swift 6.4 on the `xcode-27` runner. It verifies both SDK versions before compiling. It captures the real window with macOS `screencapture`, including composited AppKit controls that a view bitmap cache omits. It does not redraw the UI in HTML or generate an imagined image.
+This Swift-only host compiles the app's actual module graph using Xcode 27 / Swift 6.4 on the `xcode-27` runner. It verifies both SDK versions before compiling. It captures the real window with macOS `screencapture`, including composited AppKit controls that a view bitmap cache omits.
 
-The SDK 27 Foundation Models service is excluded and replaced by a preview-only implementation that always throws if called. State is in-memory preview data. Every image is visibly labeled as a preview with services disabled. These captures do not establish that the full iOS/macOS 27 app builds or runs.
+The `EngineeringPreviewHost` executable target lives in `Apps/EngineeringStudio/Tests/NativePreviewHost`. It imports the same Core, Services, Workflows and Features modules as the application. Regression checks use the real Foundation Models framework with deterministic injected transports, native cryptography, isolated Keychain records and local runtime fixtures. Screenshot state is in-memory preview data and never signs in or dispatches developers. Every image is visibly labeled as a preview with services disabled.
 
-Production targets, package manifests and deployment settings remain unchanged. Build products are disposable and ignored by Git. `BuildPreview.swift` compiles core sources directly for the preview host; it does not change the Swift 6.4 package manifest.
+`BuildPreview.swift` builds that target through SwiftPM, then creates a disposable app bundle with the production asset catalog. Build products are ignored by Git. Preview checks do not establish production app launch, live-provider consent or a signed distribution build. The separate validation workflow builds both complete application targets.
 
 On macOS 27 with Xcode 27 selected, from the repository root:
 
