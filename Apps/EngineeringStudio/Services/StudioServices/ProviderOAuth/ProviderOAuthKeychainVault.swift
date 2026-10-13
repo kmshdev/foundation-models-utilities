@@ -1,5 +1,6 @@
 import EngineeringMCP
 import Foundation
+import LocalAuthentication
 import Security
 
 /// Per-provider/slot protected records; complete rotating grants use one atomic Keychain replacement.
@@ -12,7 +13,9 @@ package final class ProviderOAuthKeychainVault: ProviderOAuthVault, Sendable {
         var query = key(record, identity)
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
-        query[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIFail
+        let context = LAContext()
+        context.interactionNotAllowed = true
+        query[kSecUseAuthenticationContext as String] = context
         var result: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
         guard status != errSecItemNotFound else { return nil }

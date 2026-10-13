@@ -59,8 +59,8 @@ actor ProviderCheckHTTP: ProviderOAuthHTTPTransport {
             return try response(["client_id": "isolated-linear-client", "redirect_uris": redirects,
                                  "token_endpoint_auth_method": "none"], status: 201)
         }
-        if (url.host == "github.com", url.path == "/login/oauth/access_token") ||
-            (url.host == "mcp.linear.app", url.path == "/token") {
+        if (url.host == "github.com" && url.path == "/login/oauth/access_token") ||
+            (url.host == "mcp.linear.app" && url.path == "/token") {
             let form = URLComponents(string: "https://fixture.invalid/?" + String(decoding: request.httpBody ?? Data(), as: UTF8.self))?.queryItems ?? []
             guard let clientID = form.first(where: { $0.name == "client_id" })?.value,
                   let grantType = form.first(where: { $0.name == "grant_type" })?.value else {

@@ -85,7 +85,8 @@ private final class CaptureDelegate: NSObject, NSApplicationDelegate {
                                                             linearMCP: fixtureProviderConnection(provider: .linear))
                 await previewConnections.githubMCP.restore()
                 await previewConnections.linearMCP.restore()
-                try await capture(IntegrationFeatureAPI.connections(store: store, connections: previewConnections),
+                try await capture(StudioSheetView(kind: .connections, store: store, connections: previewConnections,
+                                                 chatGPT: ChatGPTConnection(), runtime: DeveloperRuntimeConnection()),
                                   name: "08-provider-connections", width: 760, height: 1040, output: output)
                 try await capture(IntegrationFeatureAPI.registration(connections: previewConnections),
                                   name: "09-github-registration", width: 560, height: 720, output: output)
